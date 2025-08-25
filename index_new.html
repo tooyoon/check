@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoMaster - 스마트 체크리스트</title>
+    
+    <!-- External Libraries -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
+</head>
+<body>
+    <div id="root">
+        <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+            <div class="loading-spinner w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full"></div>
+        </div>
+    </div>
+
+    <!-- JavaScript Files -->
+    <script src="app.js" type="text/babel"></script>
+    <script src="components.js" type="text/babel"></script>
+    
+    <!-- Main App Script -->
+    <script type="text/babel">
+        // Main Application Component
+        function TodoApp() {
+            const appState = App();
+            
+            const selectedCategory = appState.categories.find(c => c.id === appState.selectedCat);
+            const hasCompletedTasks = appState.filteredTasks.some(t => t.checked);
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900">
+                    {/* Sidebar */}
+                    <Sidebar 
+                        categories={appState.categories}
+                        selectedCat={appState.selectedCat}
+                        stats={appState.stats}
+                        newCatName={appState.newCatName}
+                        editingCatId={appState.editingCatId}
+                        editCatName={appState.editCatName}
+                        editCatEmoji={appState.editCatEmoji}
+                        onSelectCategory={appState.setSelectedCat}
+                        onNewCatNameChange={appState.setNewCatName}
+                        onAddCategory={appState.addCategory}
+                        onDeleteCategory={appState.deleteCategory}
+                        onStartEditCategory={appState.startEditCategory}
+                        onEditCatNameChange={appState.setEditCatName}
+                        onEditCatEmojiChange={appState.setEditCatEmoji}
+                        onSaveEditCategory={appState.saveEditCategory}
+                        onCancelEditCategory={appState.cancelEditCategory}
+                        onOpenSettings={() => appState.setSettingsOpen(true)}
+                    />
+
+                    {/* Main Content */}
+                    <main className="main-content p-6">
+                        <div className="max-w-5xl mx-auto">
+                            {/* Header */}
+                            <MainHeader 
+                                selectedCategory={selectedCategory}
+                                filteredTasksCount={appState.filteredTasks.length}
+                                stats={appState.stats}
+                                onAddTask={appState.addTask}
+                                onClearCompleted={appState.clearCompleted}
+                                hasCompletedTasks={hasCompletedTasks}
+                            />
+
+                            {/* Filters */}
+                            <FilterBar 
+                                query={appState.query}
+                                statusFilter={appState.statusFilter}
+                                prioFilter={appState.prioFilter}
+                                sortBy={appState.sortBy}
+                                onQueryChange={appState.setQuery}
+                                onStatusFilterChange={appState.setStatusFilter}
+                                onPrioFilterChange={appState.setPrioFilter}
+                                onSortByChange={appState.setSortBy}
+                            />
+
+                            {/* Tasks */}
+                            <div className="space-y-4">
+                                {appState.filteredTasks.length === 0 ? (
+                                    <EmptyState selectedCategory={selectedCategory} />
+                                ) : (
+                                    appState.filteredTasks.map((task, index) => (
+                                        <TaskCard
+                                            key={task.id}
+                                            task={task}
+                                            categories={appState.categories}
+                                            index={index}
+                                            filteredTasks={appState.filteredTasks}
+                                            onUpdate={appState.updateTask}
+                                            onDelete={appState.deleteTask}
+                                            onToggle={appState.toggleTask}
+                                            onTogglePin={appState.togglePinTask}
+                                            onReorder={appState.reorderTasks}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Settings Modal */}
+                    <SettingsModal 
+                        isOpen={appState.settingsOpen}
+                        soundOn={appState.soundOn}
+                        onClose={() => appState.setSettingsOpen(false)}
+                        onSoundToggle={appState.setSoundOn}
+                        onTestSound={() => {
+                            if (appState.soundOn && window.playSuccess) window.playSuccess();
+                        }}
+                        onExportData={appState.exportData}
+                        onImportData={appState.importData}
+                    />
+
+                    {/* Hidden File Input */}
+                    <input
+                        ref={appState.fileInputRef}
+                        type="file"
+                        accept=".json"
+                        onChange={appState.handleFileImport}
+                        style={{ display: 'none' }}
+                    />
+
+                    {/* Floating Add Button (Mobile) */}
+                    {selectedCategory?.id !== "all" && (
+                        <div className="floating-button md:hidden">
+                            <button
+                                onClick={appState.addTask}
+                                className="w-14 h-14 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-200 flex items-center justify-center"
+                            >
+                                <span className="text-2xl">+</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        // Render the application
+        ReactDOM.render(<TodoApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>

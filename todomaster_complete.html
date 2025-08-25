@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TodoMaster - 스마트 체크리스트</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+
+        /* =============== Animations =============== */
+        .task-complete {
+            animation: completeWave 0.4s ease-out;
+        }
+
+        @keyframes completeWave {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); background-color: #dcfce7; }
+            100% { transform: scale(1); }
+        }
+
+        /* =============== Glass Effects =============== */
+        .glassmorphism {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* =============== Card Hover Effects =============== */
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            will-change: transform, box-shadow;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* =============== Layout =============== */
+        .sidebar {
+            width: 320px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border-right: 1px solid rgba(226, 232, 240, 0.8);
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .main-content {
+            margin-left: 320px;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        /* =============== Category Styles =============== */
+        .category-active {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        /* =============== Progress Bar =============== */
+        .progress-glow {
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        /* =============== Drag and Drop Styles =============== */
+        .draggable {
+            cursor: grab;
+            user-select: none;
+        }
+
+        .draggable:active {
+            cursor: grabbing;
+        }
+
+        .dragging {
+            opacity: 0.5;
+            transform: rotate(5deg);
+            z-index: 1000;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .drop-zone {
+            position: relative;
+        }
+
+        .drop-indicator {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+            border-radius: 2px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+        }
+
+        .drop-indicator.show {
+            opacity: 1;
+        }
+
+        .drop-indicator.top {
+            top: -6px;
+        }
+
+        .drop-indicator.bottom {
+            bottom: -6px;
+        }
+
+        /* =============== Task Card Enhancements =============== */
+        .task-card {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .task-card.pinned {
+            border-left: 4px solid #fbbf24;
+        }
+
+        .task-card .drag-handle {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            cursor: grab;
+            color: #9ca3af;
+        }
+
+        .task-card:hover .drag-handle {
+            opacity: 1;
+        }
+
+        .task-card .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .pin-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            animation: pinPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pinPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* =============== Mobile Responsive =============== */
+        @media (max-width: 768px) {
+            .sidebar { 
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+            
+            .sidebar.mobile-open { 
+                transform: translateX(0);
+            }
+            
+            .main-content { 
+                margin-left: 0; 
+            }
+        }
+
+        /* =============== Form Enhancements =============== */
+        .form-input {
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .form-input:focus {
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.95);
+            transform: translateY(-1px);
+        }
+
+        /* =============== Loading and States =============== */
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* =============== Scrollbar Styling =============== */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // =============== Constants ===============
+        const PRIORITIES = [
+            { value: "none", label: "없음", color: "gray" },
+            { value: "low", label: "낮음", color: "blue" },
+            { value: "medium", label: "보통", color: "yellow" },
+            { value: "high", label: "높음", color: "red" },
+        ];
+
+        // =============== Utility Functions ===============
+        const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('ko-KR') : "");
+        const fmtDateTime = (iso) => {
+            if (!iso) return "";
+            const date = new Date(iso);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays === 1) {
+                return "어제";
+            } else if (diffDays < 7) {
+                return `${diffDays}일 전`;
+            } else {
+                return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+            }
+        };
+        const todayISO = () => new Date().toISOString().slice(0, 10);
+
+        function cn(...args) {
+            return args.filter(Boolean).join(" ");
+        }
+
+        // =============== Sound Effects ===============
+        function playTone(freq = 880, duration = 0.14, type = 'triangle', gain = 0.05) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                osc.connect(g);
+                g.connect(ctx.destination);
+                const now = ctx.currentTime;
+                g.gain.setValueAtTime(0.0001, now);
+                g.gain.exponentialRampToValueAtTime(gain, now + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                osc.start(now);
+                osc.stop(now + duration + 0.02);
+                osc.onended = () => ctx.close && ctx.close();
+            } catch (e) {
+                console.log('Audio context not available');
+            }
+        }
+
+        function playSuccess() {
+            playTone(880, 0.12, 'triangle', 0.06);
+            setTimeout(() => playTone(1320, 0.12, 'triangle', 0.05), 90);
+        }
+
+        function playUndo() {
+            playTone(440, 0.12, 'sine', 0.05);
+        }
+
+        // =============== Local Storage Database ===============
+        class LocalFileDB {
+            constructor() {
+                this.data = { categories: [], tasks: [] };
+                this.loadData();
+            }
+
+            async loadData() {
+                try {
+                    const stored = localStorage.getItem('todoMasterApp');
+                    if (stored) {
+                        this.data = JSON.parse(stored);
+                    }
+                    
+                    if (this.data.categories.length === 0) {
+                        this.data.categories = [
+                            { id: "work", name: "업무", emoji: "💼", builtin: false },
+                            { id: "home", name: "가정", emoji: "🏠", builtin: false },
+                            { id: "personal", name: "개인", emoji: "👤", builtin: false },
+                            { id: "study", name: "학습", emoji: "📚", builtin: false }
+                        ];
+                        await this.saveData();
+                    }
+                } catch (e) {
+                    console.error('데이터 로드 오류:', e);
+                }
+            }
+
+            async saveData() {
+                try {
+                    localStorage.setItem('todoMasterApp', JSON.stringify(this.data));
+                } catch (e) {
+                    console.error('데이터 저장 오류:', e);
+                }
+            }
+
+            async getCategories() {
+                return [...this.data.categories];
+            }
+
+            async getTasks() {
+                return [...this.data.tasks];
+            }
+
+            async saveCategory(category) {
+                const index = this.data.categories.findIndex(c => c.id === category.id);
+                if (index >= 0) {
+                    this.data.categories[index] = category;
+                } else {
+                    this.data.categories.push(category);
+                }
+                await this.saveData();
+            }
+
+            async deleteCategory(id) {
+                this.data.categories = this.data.categories.filter(c => c.id !== id);
+                this.data.tasks = this.data.tasks.filter(t => t.categoryId !== id);
+                await this.saveData();
+            }
+
+            async saveTask(task) {
+                const index = this.data.tasks.findIndex(t => t.id === task.id);
+                if (index >= 0) {
+                    this.data.tasks[index] = task;
+                } else {
+                    this.data.tasks.push(task);
+                }
+                await this.saveData();
+            }
+
+            async deleteTask(id) {
+                this.data.tasks = this.data.tasks.filter(t => t.id !== id);
+                await this.saveData();
+            }
+
+            async exportData() {
+                return JSON.stringify(this.data, null, 2);
+            }
+
+            async importData(jsonStr) {
+                try {
+                    const newData = JSON.parse(jsonStr);
+                    this.data = newData;
+                    await this.saveData();
+                    return true;
+                } catch (e) {
+                    console.error('Import 오류:', e);
+                    return false;
+                }
+            }
+        }
+
+        const db = new LocalFileDB();
+
+        // =============== Drag and Drop Utilities ===============
+        let draggedTask = null;
+        let draggedIndex = null;
+
+        function handleDragStart(e, task, index) {
+            draggedTask = task;
+            draggedIndex = index;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.drop-indicator').forEach(indicator => {
+                indicator.classList.remove('show');
+            });
+            draggedTask = null;
+            draggedIndex = null;
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            
+            const dropZone = e.currentTarget;
+            const rect = dropZone.getBoundingClientRect();
+            const midpoint = rect.top + rect.height / 2;
+            
+            const topIndicator = dropZone.querySelector('.drop-indicator.top');
+            const bottomIndicator = dropZone.querySelector('.drop-indicator.bottom');
+            
+            if (e.clientY < midpoint) {
+                topIndicator?.classList.add('show');
+                bottomIndicator?.classList.remove('show');
+            } else {
+                topIndicator?.classList.remove('show');
+                bottomIndicator?.classList.add('show');
+            }
+        }
+
+        function handleDragLeave(e) {
+            const dropZone = e.currentTarget;
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.querySelectorAll('.drop-indicator').forEach(indicator => {
+                    indicator.classList.remove('show');
+                });
+            }
+        }
+
+        // =============== Task Card Component ===============
+        const TaskCard = React.memo(function TaskCard({ 
+            task, 
+            categories, 
+            onUpdate, 
+            onDelete, 
+            onToggle, 
+            onTogglePin, 
+            onReorder,
+            index,
+            filteredTasks 
+        }) {
+            const [editing, setEditing] = useState(false);
+            const [title, setTitle] = useState(task.title);
+            const [memo, setMemo] = useState(task.memo || "");
+            const [priority, setPriority] = useState(task.priority);
+            const [due, setDue] = useState(task.due || "");
+            const [categoryId, setCategoryId] = useState(task.categoryId);
+
+            const handleSave = () => {
+                onUpdate(task.id, {
+                    title: title.trim() || "무제",
+                    memo: memo.trim(),
+                    priority,
+                    due,
+                    categoryId,
+                });
+                setEditing(false);
+            };
+
+            const handleCancel = () => {
+                setTitle(task.title);
+                setMemo(task.memo || "");
+                setPriority(task.priority);
+                setDue(task.due || "");
+                setCategoryId(task.categoryId);
+                setEditing(false);
+            };
+
+            const priorityColor = PRIORITIES.find(p => p.value === task.priority)?.color || "gray";
+            const isOverdue = task.due && new Date(task.due) < new Date() && !task.checked;
+
+            const handleDoubleClick = () => {
+                if (!editing) setEditing(true);
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                const rect = e.currentTarget.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+                const dropPosition = e.clientY < midpoint ? 'before' : 'after';
+                
+                if (draggedTask && draggedTask.id !== task.id) {
+                    onReorder(draggedTask, index, dropPosition);
+                }
+                
+                e.currentTarget.querySelectorAll('.drop-indicator').forEach(indicator => {
+                    indicator.classList.remove('show');
+                });
+            };
+
+            if (editing) {
+                return (
+                    <div className="glassmorphism rounded-2xl p-6 transition-all duration-300 task-card fade-in">
+                        <div className="space-y-4">
+                            <input
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleSave();
+                                    }
+                                    if (e.key === "Escape") {
+                                        handleCancel();
+                                    }
+                                }}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent form-input"
+                                placeholder="작업 제목 (엔터: 저장, ESC: 취소)"
+                                autoFocus
+                            />
+                            <textarea
+                                value={memo}
+                                onChange={(e) => setMemo(e.target.value)}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent form-input"
+                                placeholder="메모 (선택사항)"
+                                rows={3}
+                            />
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <select
+                                    value={priority}
+                                    onChange={(e) => setPriority(e.target.value)}
+                                    className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                                >
+                                    {PRIORITIES.map(p => (
+                                        <option key={p.value} value={p.value}>
+                                            {p.value === 'high' ? '🔴' : p.value === 'medium' ? '🟡' : p.value === 'low' ? '🔵' : '⚪'} {p.label}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="date"
+                                    value={due}
+                                    onChange={(e) => setDue(e.target.value)}
+                                    className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                                />
+                                <select
+                                    value={categoryId}
+                                    onChange={(e) => setCategoryId(e.target.value)}
+                                    className="px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                                >
+                                    {categories.filter(c => c.id !== "all").map(c => (
+                                        <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleSave}
+                                    className="px-6 py-3 rounded-xl text-white font-medium btn-primary"
+                                >
+                                    💾 저장
+                                </button>
+                                <button
+                                    onClick={handleCancel}
+                                    className="px-6 py-3 rounded-xl font-medium btn-secondary"
+                                >
+                                    ❌ 취소
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div
+                    className={cn(
+                        "glassmorphism rounded-2xl p-6 transition-all duration-300 card-hover task-card drop-zone relative fade-in",
+                        task.checked && "opacity-70 grayscale",
+                        isOverdue && "ring-2 ring-red-300 bg-red-50/50",
+                        task.pinned && "ring-2 ring-yellow-400 bg-yellow-50/30",
+                        !task.checked && "hover:shadow-lg"
+                    )}
+                    data-task-id={task.id}
+                    onDoubleClick={handleDoubleClick}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    draggable={!editing}
+                    onDragStart={(e) => handleDragStart(e, task, index)}
+                    onDragEnd={handleDragEnd}
+                >
+                    <div className="drop-indicator top"></div>
+                    <div className="drop-indicator bottom"></div>
+                    
+                    {task.pinned && (
+                        <div className="pin-badge">
+                            📌
+                        </div>
+                    )}
+                    
+                    <div className="flex items-start gap-4">
+                        <div className="drag-handle text-lg p-1 rounded hover:bg-gray-100" title="드래그해서 순서 변경">
+                            ⋮⋮
+                        </div>
+                        
+                        <button
+                            onClick={() => onToggle(task.id)}
+                            className={cn(
+                                "mt-1 w-7 h-7 rounded-xl border-2 flex items-center justify-center transition-all duration-300 font-bold",
+                                task.checked
+                                    ? "bg-gradient-to-r from-emerald-500 to-teal-600 border-emerald-500 text-white shadow-lg transform scale-110"
+                                    : "border-gray-300 hover:border-blue-500 hover:bg-blue-50 hover:scale-105"
+                            )}
+                        >
+                            {task.checked && "✓"}
+                        </button>
+                        
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-3 mb-2">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 mb-1">
+                                        <h4
+                                            className={cn(
+                                                "font-semibold text-lg",
+                                                task.checked && "line-through text-gray-500"
+                                            )}
+                                        >
+                                            {task.title}
+                                        </h4>
+                                        {task.priority !== "none" && (
+                                            <span
+                                                className={cn(
+                                                    "px-3 py-1 text-xs font-medium rounded-full flex-shrink-0",
+                                                    priorityColor === "red" && "bg-gradient-to-r from-red-100 to-red-200 text-red-700 border border-red-300",
+                                                    priorityColor === "yellow" && "bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-700 border border-yellow-300",
+                                                    priorityColor === "blue" && "bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 border border-blue-300"
+                                                )}
+                                            >
+                                                {task.priority === 'high' ? '🔴' : task.priority === 'medium' ? '🟡' : task.priority === 'low' ? '🔵' : '⚪'} {PRIORITIES.find(p => p.value === task.priority)?.label}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {task.memo && (
+                                        <p className={cn(
+                                            "text-sm leading-relaxed truncate",
+                                            task.checked ? "text-gray-400" : "text-gray-500"
+                                        )}>
+                                            💬 {task.memo}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-sm text-gray-500">
+                                <div className="flex items-center gap-4">
+                                    {task.due && (
+                                        <span className={cn(
+                                            "flex items-center gap-1 px-2 py-1 rounded-lg",
+                                            isOverdue ? "text-red-600 font-medium bg-red-50" : "bg-gray-100"
+                                        )}>
+                                            📅 {fmtDate(task.due)}
+                                            {isOverdue && " ⚠️"}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex items-center gap-3 text-xs text-gray-400">
+                                    {task.createdAt && (
+                                        <span title={`생성: ${new Date(task.createdAt).toLocaleString('ko-KR')}`}>
+                                            🆕 {fmtDateTime(task.createdAt)}
+                                        </span>
+                                    )}
+                                    {task.updatedAt && task.updatedAt !== task.createdAt && (
+                                        <span title={`수정: ${new Date(task.updatedAt).toLocaleString('ko-KR')}`}>
+                                            📝 {fmtDateTime(task.updatedAt)}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => onTogglePin(task.id)}
+                                className={cn(
+                                    "p-2 rounded-xl transition-all duration-200",
+                                    task.pinned 
+                                        ? "text-yellow-600 hover:text-yellow-700 bg-yellow-50 hover:bg-yellow-100" 
+                                        : "text-gray-400 hover:text-yellow-600 hover:bg-yellow-50"
+                                )}
+                                title={task.pinned ? "고정 해제" : "상단 고정"}
+                            >
+                                <span className="text-lg">📌</span>
+                            </button>
+                            <button
+                                onClick={() => setEditing(true)}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200"
+                                title="편집 (더블클릭 가능)"
+                            >
+                                <span className="text-lg">✏️</span>
+                            </button>
+                            <button
+                                onClick={() => onDelete(task.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200"
+                                title="삭제"
+                            >
+                                <span className="text-lg">🗑️</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }, (prevProps, nextProps) => {
+            return prevProps.task.id === nextProps.task.id &&
+                   prevProps.task.title === nextProps.task.title &&
+                   prevProps.task.checked === nextProps.task.checked &&
+                   prevProps.task.priority === nextProps.task.priority &&
+                   prevProps.task.due === nextProps.task.due &&
+                   prevProps.task.memo === nextProps.task.memo &&
+                   prevProps.task.pinned === nextProps.task.pinned &&
+                   prevProps.task.categoryId === nextProps.task.categoryId &&
+                   prevProps.index === nextProps.index;
+        });
+
+        // =============== Main App Component ===============
+        function App() {
+            const [categories, setCategories] = useState([]);
+            const [tasks, setTasks] = useState([]);
+            const [selectedCat, setSelectedCat] = useState("all");
+            const [query, setQuery] = useState("");
+            const [debouncedQuery, setDebouncedQuery] = useState("");
+            const [statusFilter, setStatusFilter] = useState("all");
+            const [prioFilter, setPrioFilter] = useState("all");
+            const [sortBy, setSortBy] = useState("order");
+            const [settingsOpen, setSettingsOpen] = useState(false);
+            const [newCatName, setNewCatName] = useState("");
+            const [soundOn, setSoundOn] = useState(true);
+            const [editingCatId, setEditingCatId] = useState(null);
+            const [editCatName, setEditCatName] = useState("");
+            const [editCatEmoji, setEditCatEmoji] = useState("");
+            const [quickTaskText, setQuickTaskText] = useState("");
+            const fileInputRef = useRef(null);
+            const textFileInputRef = useRef(null);
+
+            // Debounce search query
+            useEffect(() => {
+                const timer = setTimeout(() => {
+                    setDebouncedQuery(query);
+                }, 300);
+                return () => clearTimeout(timer);
+            }, [query]);
+
+            // Load data on mount
+            useEffect(() => {
+                loadAllData();
+            }, []);
+
+            async function loadAllData() {
+                const cats = await db.getCategories();
+                const tasks = await db.getTasks();
+                
+                // 기존 작업들에 createdAt, updatedAt이 없으면 기본값 설정
+                const tasksWithDates = tasks.map(task => ({
+                    ...task,
+                    createdAt: task.createdAt || new Date().toISOString(),
+                    updatedAt: task.updatedAt || task.createdAt || new Date().toISOString()
+                }));
+                
+                setCategories([{ id: "all", name: "전체", emoji: "📋", builtin: true }, ...cats]);
+                setTasks(tasksWithDates);
+            }
+
+            // Stats
+            const stats = useMemo(() => {
+                const filtered = selectedCat === "all" ? tasks : tasks.filter(t => t.categoryId === selectedCat);
+                const completed = filtered.filter(t => t.checked).length;
+                const total = filtered.length;
+                return { completed, total, progress: total > 0 ? Math.round((completed / total) * 100) : 0 };
+            }, [tasks, selectedCat]);
+
+            // Filtered and sorted tasks
+            const filteredTasks = useMemo(() => {
+                let result = tasks;
+
+                if (selectedCat !== "all") {
+                    result = result.filter(t => t.categoryId === selectedCat);
+                }
+
+                if (debouncedQuery.trim()) {
+                    const q = debouncedQuery.toLowerCase();
+                    result = result.filter(t => 
+                        t.title.toLowerCase().includes(q) || 
+                        (t.memo && t.memo.toLowerCase().includes(q))
+                    );
+                }
+
+                if (statusFilter === "completed") {
+                    result = result.filter(t => t.checked);
+                } else if (statusFilter === "pending") {
+                    result = result.filter(t => !t.checked);
+                }
+
+                if (prioFilter !== "all") {
+                    result = result.filter(t => t.priority === prioFilter);
+                }
+
+                result.sort((a, b) => {
+                    if (a.pinned && !b.pinned) return -1;
+                    if (!a.pinned && b.pinned) return 1;
+                    
+                    if (sortBy === "priority") {
+                        const prio = { none: 0, low: 1, medium: 2, high: 3 };
+                        return prio[b.priority] - prio[a.priority];
+                    } else if (sortBy === "due") {
+                        if (!a.due && !b.due) return 0;
+                        if (!a.due) return 1;
+                        if (!b.due) return -1;
+                        return new Date(a.due) - new Date(b.due);
+                    } else if (sortBy === "name") {
+                        return a.title.localeCompare(b.title);
+                    } else if (sortBy === "created") {
+                        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+                    } else if (sortBy === "updated") {
+                        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+                    }
+                    return a.order - b.order;
+                });
+
+                return result;
+            }, [tasks, selectedCat, debouncedQuery, statusFilter, prioFilter, sortBy]);
+
+            // Actions
+            async function addCategory() {
+                if (!newCatName.trim()) return;
+                const cat = {
+                    id: uid(),
+                    name: newCatName.trim(),
+                    emoji: "📁",
+                    builtin: false,
+                };
+                await db.saveCategory(cat);
+                setCategories(prev => [...prev, cat]);
+                setNewCatName("");
+            }
+
+            async function deleteCategory(id) {
+                if (!confirm("이 카테고리와 관련된 모든 작업이 삭제됩니다. 계속하시겠습니까?")) return;
+                await db.deleteCategory(id);
+                setCategories(prev => prev.filter(c => c.id !== id));
+                setTasks(prev => prev.filter(t => t.categoryId !== id));
+                if (selectedCat === id) setSelectedCat("all");
+            }
+
+            async function renameCategory(catId, newName, newEmoji) {
+                const cat = categories.find(c => c.id === catId);
+                if (!cat || cat.builtin) return;
+                
+                const updated = { ...cat, name: newName, emoji: newEmoji };
+                await db.saveCategory(updated);
+                setCategories(prev => prev.map(c => c.id === catId ? updated : c));
+            }
+
+            async function addTask(taskTitle = "새 작업") {
+                if (selectedCat === "all") {
+                    alert("작업을 추가하려면 특정 카테고리를 선택해주세요.");
+                    return;
+                }
+                const now = new Date().toISOString();
+                const task = {
+                    id: uid(),
+                    title: taskTitle.trim() || "새 작업",
+                    checked: false,
+                    priority: "none",
+                    due: "",
+                    memo: "",
+                    categoryId: selectedCat,
+                    order: 0, // 새 작업은 항상 맨 위로
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                try {
+                    // 기존 작업들의 order를 1씩 증가
+                    const updatedTasks = tasks.map(t => ({ ...t, order: t.order + 1 }));
+                    for (const t of updatedTasks) {
+                        await db.saveTask(t);
+                    }
+                    
+                    await db.saveTask(task);
+                    setTasks(prev => [task, ...prev.map(t => ({ ...t, order: t.order + 1 }))]);
+                } catch (error) {
+                    console.error('작업 추가 실패:', error);
+                    alert('작업 추가에 실패했습니다.');
+                }
+            }
+
+            async function addQuickTask() {
+                if (!quickTaskText.trim()) return;
+                await addTask(quickTaskText);
+                setQuickTaskText("");
+            }
+
+            async function updateTask(id, updates) {
+                const task = tasks.find(t => t.id === id);
+                if (!task) return;
+                const updated = { 
+                    ...task, 
+                    ...updates, 
+                    updatedAt: new Date().toISOString() 
+                };
+                await db.saveTask(updated);
+                setTasks(prev => prev.map(t => t.id === id ? updated : t));
+            }
+
+            async function togglePinTask(id) {
+                const task = tasks.find(t => t.id === id);
+                if (!task) return;
+                await updateTask(id, { pinned: !task.pinned });
+            }
+
+            async function deleteTask(id) {
+                await db.deleteTask(id);
+                setTasks(prev => prev.filter(t => t.id !== id));
+            }
+
+            async function toggleTask(id) {
+                const t = tasks.find(x => x.id === id);
+                if (!t) return;
+                const nextChecked = !t.checked;
+                
+                if (soundOn) {
+                    if (nextChecked) playSuccess(); 
+                    else playUndo();
+                }
+                
+                const taskEl = document.querySelector(`[data-task-id="${id}"]`);
+                if (taskEl && nextChecked) {
+                    taskEl.classList.add('task-complete');
+                    setTimeout(() => taskEl.classList.remove('task-complete'), 400);
+                }
+                
+                await updateTask(id, { checked: nextChecked });
+            }
+
+            async function reorderTasks(draggedTask, targetIndex, position) {
+                const currentTasks = [...filteredTasks];
+                const draggedIndex = currentTasks.findIndex(t => t.id === draggedTask.id);
+                
+                if (draggedIndex === -1) return;
+                
+                currentTasks.splice(draggedIndex, 1);
+                
+                let newIndex = targetIndex;
+                if (draggedIndex < targetIndex) newIndex--;
+                if (position === 'after') newIndex++;
+                
+                currentTasks.splice(newIndex, 0, draggedTask);
+                
+                const updatedTasks = currentTasks.map((task, index) => ({
+                    ...task,
+                    order: index
+                }));
+                
+                for (const task of updatedTasks) {
+                    await db.saveTask(task);
+                }
+                
+                setTasks(prev => {
+                    const updated = [...prev];
+                    updatedTasks.forEach(updatedTask => {
+                        const index = updated.findIndex(t => t.id === updatedTask.id);
+                        if (index !== -1) {
+                            updated[index] = updatedTask;
+                        }
+                    });
+                    return updated;
+                });
+            }
+
+            async function clearCompleted() {
+                if (!confirm("완료된 모든 작업을 삭제하시겠습니까?")) return;
+                const completedIds = tasks.filter(t => t.checked).map(t => t.id);
+                for (const id of completedIds) {
+                    await db.deleteTask(id);
+                }
+                setTasks(prev => prev.filter(t => !t.checked));
+            }
+
+            async function exportData() {
+                const data = await db.exportData();
+                const blob = new Blob([data], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `todomaster-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+
+            async function importData() {
+                fileInputRef.current?.click();
+            }
+
+            async function handleFileImport(event) {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                
+                const text = await file.text();
+                const success = await db.importData(text);
+                if (success) {
+                    await loadAllData();
+                    alert("데이터를 성공적으로 가져왔습니다!");
+                } else {
+                    alert("파일 형식이 올바르지 않습니다.");
+                }
+                event.target.value = '';
+            }
+
+            function startEditCategory(catId) {
+                const cat = categories.find(c => c.id === catId);
+                if (!cat || cat.builtin) return;
+                setEditingCatId(catId);
+                setEditCatName(cat.name);
+                setEditCatEmoji(cat.emoji || "📁");
+            }
+
+            function saveEditCategory() {
+                if (!editCatName.trim()) return;
+                renameCategory(editingCatId, editCatName.trim(), editCatEmoji);
+                setEditingCatId(null);
+                setEditCatName("");
+                setEditCatEmoji("");
+            }
+
+            function cancelEditCategory() {
+                setEditingCatId(null);
+                setEditCatName("");
+                setEditCatEmoji("");
+            }
+
+            const selectedCategory = categories.find(c => c.id === selectedCat);
+            const hasCompletedTasks = filteredTasks.some(t => t.checked);
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900">
+                    {/* Sidebar */}
+                    <aside className="sidebar p-6">
+                        <div className="mb-8">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                                    <span className="text-white text-lg font-bold">✓</span>
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-gray-800">TodoMaster</h1>
+                                    <p className="text-xs text-gray-500">스마트 체크리스트</p>
+                                </div>
+                            </div>
+                            <div className="glassmorphism rounded-2xl p-4 mb-4 fade-in">
+                                <div className="text-sm text-gray-600 mb-2">전체 진행률</div>
+                                <div className="text-2xl font-bold text-gray-800 mb-2">
+                                    {stats.completed}/{stats.total}
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+                                    <div
+                                        className="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full transition-all duration-500 progress-glow"
+                                        style={{ width: `${stats.progress}%` }}
+                                    ></div>
+                                </div>
+                                <div className="text-xs text-gray-500">{stats.progress}% 완료</div>
+                            </div>
+                        </div>
+
+                        <div className="mb-6">
+                            <div className="font-semibold mb-3 text-gray-700">📂 카테고리</div>
+                            <div className="space-y-2">
+                                {categories.map((c) => (
+                                    <div
+                                        key={c.id}
+                                        className={cn(
+                                            "flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 card-hover",
+                                            selectedCat === c.id 
+                                                ? "category-active text-white shadow-lg" 
+                                                : "glassmorphism hover:shadow-md"
+                                        )}
+                                    >
+                                        {editingCatId === c.id ? (
+                                            <div className="flex-1 space-y-2">
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        value={editCatEmoji}
+                                                        onChange={(e) => setEditCatEmoji(e.target.value)}
+                                                        placeholder="🏷️"
+                                                        className="w-12 px-2 py-1 border rounded text-center"
+                                                        maxLength={2}
+                                                    />
+                                                    <input
+                                                        value={editCatName}
+                                                        onChange={(e) => setEditCatName(e.target.value)}
+                                                        placeholder="카테고리 이름"
+                                                        className="flex-1 px-2 py-1 border rounded"
+                                                        autoFocus
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") saveEditCategory();
+                                                            if (e.key === "Escape") cancelEditCategory();
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button
+                                                        onClick={saveEditCategory}
+                                                        className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                    >
+                                                        저장
+                                                    </button>
+                                                    <button
+                                                        onClick={cancelEditCategory}
+                                                        className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
+                                                    >
+                                                        취소
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span 
+                                                    className="text-lg w-6 text-center"
+                                                    onClick={() => setSelectedCat(c.id)}
+                                                >
+                                                    {c.emoji || "📁"}
+                                                </span>
+                                                <div 
+                                                    className="flex-1 font-medium"
+                                                    onClick={() => setSelectedCat(c.id)}
+                                                >
+                                                    {c.name}
+                                                </div>
+                                                {!c.builtin && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                startEditCategory(c.id);
+                                                            }}
+                                                            className="text-gray-400 hover:text-blue-600"
+                                                            title="수정"
+                                                        >
+                                                            ✎
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteCategory(c.id);
+                                                            }}
+                                                            className="text-gray-400 hover:text-red-600"
+                                                            title="삭제"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="mt-6 bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50">
+                                <div className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                    <span>➕</span>
+                                    새 카테고리 추가
+                                </div>
+                                <div className="space-y-3">
+                                    <input
+                                        value={newCatName}
+                                        onChange={(e) => setNewCatName(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                                        placeholder="카테고리 이름을 입력하세요..."
+                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
+                                    />
+                                    <button
+                                        onClick={addCategory}
+                                        disabled={!newCatName.trim()}
+                                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-2"
+                                    >
+                                        <span>✨</span>
+                                        추가하기
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <button
+                                onClick={() => setSettingsOpen(true)}
+                                className="w-full px-4 py-2 text-left rounded-xl hover:bg-gray-100 flex items-center gap-2"
+                            >
+                                ⚙️ 설정
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="main-content p-6">
+                        <div className="max-w-5xl mx-auto">
+                            {/* Header */}
+                            <div className="glassmorphism rounded-3xl p-6 mb-6 fade-in">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                                            <span className="text-white text-xl">
+                                                {selectedCategory?.emoji || "📋"}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-3xl font-bold text-gray-800">
+                                                {selectedCategory?.name || "전체"}
+                                            </h2>
+                                            <p className="text-gray-500">
+                                                {filteredTasks.length}개의 작업이 있습니다
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-3 items-center">
+                                        {selectedCategory?.id !== "all" && (
+                                            <>
+                                                <div className="flex gap-2 items-center">
+                                                    <input
+                                                        value={quickTaskText}
+                                                        onChange={(e) => setQuickTaskText(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                                e.preventDefault();
+                                                                addQuickTask();
+                                                            }
+                                                        }}
+                                                        placeholder="작업 이름을 입력하고 엔터..."
+                                                        className="px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-emerald-500 focus:outline-none bg-white/90 backdrop-blur-sm font-medium min-w-64 form-input"
+                                                    />
+                                                    <button
+                                                        onClick={addQuickTask}
+                                                        disabled={!quickTaskText.trim()}
+                                                        className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transform hover:scale-105 transition-all duration-200 shadow-lg font-medium flex items-center gap-2 btn-primary"
+                                                    >
+                                                        <span className="text-lg">✨</span>
+                                                        추가
+                                                    </button>
+                                                </div>
+                                                <button
+                                                    onClick={() => addTask()}
+                                                    className="px-4 py-3 rounded-2xl glassmorphism hover:shadow-md transition-all duration-200 text-gray-700 font-medium btn-secondary"
+                                                    title="빈 작업 추가"
+                                                >
+                                                    ➕ 빈 작업
+                                                </button>
+                                            </>
+                                        )}
+                                        {hasCompletedTasks && (
+                                            <button
+                                                onClick={clearCompleted}
+                                                className="px-4 py-3 rounded-2xl glassmorphism hover:shadow-md transition-all duration-200 text-gray-700 font-medium btn-secondary"
+                                            >
+                                                🗑️ 완료 삭제
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden">
+                                    <div
+                                        className="bg-gradient-to-r from-emerald-500 to-teal-600 h-4 rounded-full transition-all duration-700 progress-glow relative"
+                                        style={{ width: `${stats.progress}%` }}
+                                    >
+                                        <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Filters */}
+                            <div className="glassmorphism rounded-2xl p-4 mb-6 fade-in">
+                                <div className="flex flex-wrap gap-3">
+                                    <div className="flex-1 min-w-64">
+                                        <input
+                                            value={query}
+                                            onChange={(e) => setQuery(e.target.value)}
+                                            placeholder="🔍 작업 검색..."
+                                            className="w-full px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm font-medium form-input"
+                                        />
+                                    </div>
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm font-medium form-input"
+                                    >
+                                        <option value="all">📋 모든 상태</option>
+                                        <option value="pending">⏳ 미완료</option>
+                                        <option value="completed">✅ 완료</option>
+                                    </select>
+                                    <select
+                                        value={prioFilter}
+                                        onChange={(e) => setPrioFilter(e.target.value)}
+                                        className="px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm font-medium form-input"
+                                    >
+                                        <option value="all">🎯 모든 우선순위</option>
+                                        {PRIORITIES.map(p => (
+                                            <option key={p.value} value={p.value}>
+                                                {p.value === 'high' ? '🔴' : p.value === 'medium' ? '🟡' : p.value === 'low' ? '🔵' : '⚪'} {p.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        className="px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm font-medium form-input"
+                                    >
+                                        <option value="order">📅 등록순</option>
+                                        <option value="created">🆕 생성일</option>
+                                        <option value="updated">📝 수정일</option>
+                                        <option value="priority">⭐ 우선순위</option>
+                                        <option value="due">⏰ 마감일</option>
+                                        <option value="name">🔤 이름</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* Tasks */}
+                            <div className="space-y-4">
+                                {filteredTasks.length === 0 ? (
+                                    <div className="text-center py-12 glassmorphism rounded-2xl fade-in">
+                                        <div className="text-6xl mb-4">📝</div>
+                                        <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                                            {selectedCategory?.id === "all" 
+                                                ? "작업이 없습니다" 
+                                                : "이 카테고리에 작업이 없습니다"}
+                                        </h3>
+                                        <p className="text-gray-500 mb-4">
+                                            {selectedCategory?.id === "all"
+                                                ? "카테고리를 선택하고 새로운 작업을 추가해보세요!"
+                                                : "새로운 작업을 추가해서 시작해보세요!"}
+                                        </p>
+                                        {selectedCategory?.id !== "all" && (
+                                            <div className="text-sm text-gray-400">
+                                                💡 팁: 더블클릭으로 빠른 편집, 드래그로 순서 변경
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    filteredTasks.map((task, index) => (
+                                        <TaskCard
+                                            key={task.id}
+                                            task={task}
+                                            categories={categories}
+                                            index={index}
+                                            filteredTasks={filteredTasks}
+                                            onUpdate={updateTask}
+                                            onDelete={deleteTask}
+                                            onToggle={toggleTask}
+                                            onTogglePin={togglePinTask}
+                                            onReorder={reorderTasks}
+                                        />
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* Settings Modal */}
+                    {settingsOpen && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 fade-in">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-md m-4 glassmorphism">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-bold">⚙️ 설정</h3>
+                                    <button
+                                        onClick={() => setSettingsOpen(false)}
+                                        className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <section>
+                                        <h4 className="font-semibold mb-2">🔊 사운드</h4>
+                                        <div className="flex items-center gap-3">
+                                            <label className="inline-flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={soundOn}
+                                                    onChange={(e) => setSoundOn(e.target.checked)}
+                                                    className="rounded"
+                                                />
+                                                체크/해제 시 효과음 재생
+                                            </label>
+                                            <button
+                                                onClick={() => {
+                                                    if (soundOn) playSuccess();
+                                                }}
+                                                className="px-3 py-2 rounded-xl border hover:bg-gray-50 text-sm btn-secondary"
+                                            >
+                                                🎵 테스트
+                                            </button>
+                                        </div>
+                                    </section>
+
+                                    <section>
+                                        <h4 className="font-semibold mb-2">💾 데이터 백업</h4>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={exportData}
+                                                className="flex-1 px-4 py-2 rounded-xl border hover:bg-gray-50 btn-secondary"
+                                            >
+                                                📤 내보내기
+                                            </button>
+                                            <button
+                                                onClick={importData}
+                                                className="flex-1 px-4 py-2 rounded-xl border hover:bg-gray-50 btn-secondary"
+                                            >
+                                                📥 가져오기
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            JSON 파일로 데이터를 백업하거나 복원할 수 있습니다.
+                                        </p>
+                                    </section>
+
+                                    <section>
+                                        <h4 className="font-semibold mb-2">🎯 드래그 앤 드롭</h4>
+                                        <p className="text-sm text-gray-600">
+                                            작업 카드 왼쪽의 <span className="font-mono text-gray-800">⋮⋮</span> 핸들을 드래그해서 순서를 변경할 수 있습니다.
+                                        </p>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Hidden File Input */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".json"
+                        onChange={handleFileImport}
+                        style={{ display: 'none' }}
+                    />
+                </div>
+            );
+        }
+
+        // Render the application
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
