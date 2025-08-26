@@ -300,18 +300,49 @@
 
         // Load user statistics
         async function loadStatistics() {
-            // Get user stats from database
-            const stats = await analyticsManager.getUserStats();
+            try {
+                // Get user stats from database (will return defaults if not found)
+                const stats = await analyticsManager.getUserStats();
+                
+                // Load local data
+                const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+                const localMindmaps = JSON.parse(localStorage.getItem('mindMapBoards') || '[]');
+                
+                // Use local data as primary source, database as fallback
+                const totalTasks = localTasks.length || stats?.total_todos || 0;
+                const completedTasks = localTasks.filter(t => t.checked).length || stats?.completed_todos || 0;
+                const totalMindmaps = Object.keys(localMindmaps || {}).length || stats?.total_mindmaps || 0;
+                const streakDays = stats?.streak_days || calculateStreak();
+                
+                // Update stats display
+                document.getElementById('total-tasks').textContent = totalTasks;
+                document.getElementById('completed-tasks').textContent = completedTasks;
+                document.getElementById('total-mindmaps').textContent = totalMindmaps;
+                document.getElementById('streak-days').textContent = streakDays;
+                
+                console.log('Stats loaded:', { totalTasks, completedTasks, totalMindmaps, streakDays });
+            } catch (error) {
+                console.error('Failed to load statistics:', error);
+                // Set default values
+                document.getElementById('total-tasks').textContent = '0';
+                document.getElementById('completed-tasks').textContent = '0';
+                document.getElementById('total-mindmaps').textContent = '0';
+                document.getElementById('streak-days').textContent = '0';
+            }
+        }
+        
+        function calculateStreak() {
+            // Simple streak calculation based on local storage
+            const lastActivity = localStorage.getItem('lastActivityDate');
+            const today = new Date().toDateString();
             
-            // Load local data as fallback
-            const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
-            const localMindmaps = JSON.parse(localStorage.getItem('mindMapBoards') || '[]');
+            if (lastActivity === today) {
+                const streak = parseInt(localStorage.getItem('activityStreak') || '0');
+                return streak;
+            }
             
-            // Update stats display
-            document.getElementById('total-tasks').textContent = stats?.total_todos || localTasks.length || 0;
-            document.getElementById('completed-tasks').textContent = stats?.completed_todos || localTasks.filter(t => t.checked).length || 0;
-            document.getElementById('total-mindmaps').textContent = stats?.total_mindmaps || localMindmaps.length || 0;
-            document.getElementById('streak-days').textContent = stats?.streak_days || 0;
+            // Reset streak if no activity today
+            return 0;
         }
 
         // Load charts

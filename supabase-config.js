@@ -487,13 +487,37 @@ class AnalyticsManager {
     async getUserStats() {
         if (!this.userManager.isLoggedIn()) return null;
 
-        const { data } = await supabase
-            .from('user_stats')
-            .select('*')
-            .eq('user_id', this.userManager.currentUser.id)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('user_stats')
+                .select('*')
+                .eq('user_id', this.userManager.currentUser.id)
+                .single();
 
-        return data;
+            if (error) {
+                console.log('User stats not found (expected if new user):', error.message);
+                // Return default stats
+                return {
+                    total_todos: 0,
+                    completed_todos: 0,
+                    total_mindmaps: 0,
+                    total_nodes: 0,
+                    streak_days: 0
+                };
+            }
+
+            return data;
+        } catch (err) {
+            console.error('Failed to get user stats:', err);
+            // Return default stats
+            return {
+                total_todos: 0,
+                completed_todos: 0,
+                total_mindmaps: 0,
+                total_nodes: 0,
+                streak_days: 0
+            };
+        }
     }
 }
 
