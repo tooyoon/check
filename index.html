@@ -1684,6 +1684,8 @@
             const [sortBy, setSortBy] = useState("order");
             const [settingsOpen, setSettingsOpen] = useState(false);
             const [newCatName, setNewCatName] = useState("");
+            const [selectedEmoji, setSelectedEmoji] = useState("📁");
+            const [showEmojiPicker, setShowEmojiPicker] = useState(false);
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [authLoading, setAuthLoading] = useState(true);
             const [soundOn, setSoundOn] = useState(true);
@@ -1884,12 +1886,14 @@
                 const cat = {
                     id: uid(),
                     name: newCatName.trim(),
-                    emoji: getRandomCategoryEmoji(),
+                    emoji: selectedEmoji,
                     builtin: false,
                 };
                 await db.saveCategory(cat);
                 setCategories(prev => [...prev, cat]);
                 setNewCatName("");
+                setSelectedEmoji("📁");
+                setShowEmojiPicker(false);
             }
 
             async function deleteCategory(id) {
@@ -2504,13 +2508,51 @@
                                     새 카테고리 추가
                                 </div>
                                 <div className="space-y-3">
-                                    <input
-                                        value={newCatName}
-                                        onChange={(e) => setNewCatName(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && addCategory()}
-                                        placeholder="카테고리 이름을 입력하세요..."
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
-                                    />
+                                    <div className="flex gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                            className="w-14 h-12 border border-gray-200 rounded-xl flex items-center justify-center text-xl hover:bg-gray-50 transition-colors"
+                                            title="이모지 선택"
+                                        >
+                                            {selectedEmoji}
+                                        </button>
+                                        <input
+                                            value={newCatName}
+                                            onChange={(e) => setNewCatName(e.target.value)}
+                                            onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                                            placeholder="카테고리 이름을 입력하세요..."
+                                            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
+                                        />
+                                    </div>
+                                    
+                                    {showEmojiPicker && (
+                                        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-lg">
+                                            <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                                                {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
+                                                  "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
+                                                  "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
+                                                  "🔮", "💎", "🎯", "🎨", "🎭", "🎪", "🎲", "🎮",
+                                                  "⭐", "🌟", "💫", "✨", "🔥", "💥", "⚡", "🌈",
+                                                  "🏠", "🏢", "🏆", "🎁", "🎉", "🎊", "💼", "💰",
+                                                  "🔧", "🔨", "⚙️", "🧰", "🔬", "🔭", "💻", "🖥️",
+                                                  "🌸", "🌺", "🌻", "🌹", "🌷", "🌱", "🌳", "🍀"].map(emoji => (
+                                                    <button
+                                                        key={emoji}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedEmoji(emoji);
+                                                            setShowEmojiPicker(false);
+                                                        }}
+                                                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-lg text-xl transition-colors"
+                                                    >
+                                                        {emoji}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
                                     <button
                                         onClick={addCategory}
                                         disabled={!newCatName.trim()}

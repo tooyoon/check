@@ -328,6 +328,9 @@
                 <span style="font-size: 0.5em; opacity: 0.8;">Beta</span>
             </h1>
             <p>CheckMaster를 더 좋게 만들어주세요! 건의사항, 버그, 아이디어를 공유해주세요.</p>
+            <div id="authStatus" style="margin-top: 15px; padding: 10px; background: rgba(255,255,255,0.8); border-radius: 8px; font-size: 14px;">
+                <!-- Auth status will be shown here -->
+            </div>
         </div>
         
         <div class="feedback-form">
@@ -355,15 +358,6 @@
                     <textarea id="content" required placeholder="자세한 내용을 적어주세요. 버그의 경우 재현 방법을 알려주시면 도움이 됩니다."></textarea>
                 </div>
                 
-                <div class="form-group">
-                    <label for="name">이름 (선택)</label>
-                    <input type="text" id="name" placeholder="이름 또는 닉네임">
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">이메일 (선택)</label>
-                    <input type="email" id="email" placeholder="답변을 원하시면 이메일을 남겨주세요">
-                </div>
                 
                 <button type="submit" class="submit-btn">피드백 제출</button>
             </form>
@@ -444,10 +438,20 @@
                 return;
             }
             
+            // Check if user is logged in
+            if (!userManager.currentUser) {
+                showMessage('피드백을 작성하려면 먼저 로그인해주세요.', 'error');
+                // Show login button
+                await userManager.checkAuth();
+                return;
+            }
+            
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
+            
+            // Get user info
+            const userName = userManager.currentUser.email?.split('@')[0] || '사용자';
+            const userEmail = userManager.currentUser.email;
             
             // Save to Supabase
             const { error } = await supabase
@@ -457,9 +461,9 @@
                         category: selectedCategory,
                         title: title,
                         content: content,
-                        name: name || null,
-                        email: email || null,
-                        user_id: userManager.currentUser?.id || null,
+                        name: userName,
+                        email: userEmail,
+                        user_id: userManager.currentUser.id,
                         votes: 0,
                         status: 'pending'
                     }
@@ -592,7 +596,7 @@
                         </div>
                         <div class="vote-buttons">
                             <button class="vote-btn ${userVotes[feedback.id] ? 'voted' : ''}" 
-                                    onclick="toggleVote('${feedback.id}')">
+                                    onclick="event.stopPropagation(); toggleVote('${feedback.id}')">
                                 👍 ${feedback.votes || 0}
                             </button>
                         </div>
@@ -691,8 +695,37 @@
             }, 3000);
         }
         
+        // Update auth status display
+        async function updateAuthStatus() {
+            const authDiv = document.getElementById('authStatus');
+            await userManager.checkAuth();
+            
+            if (userManager.currentUser) {
+                authDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>👤 로그인됨: <strong>${userManager.currentUser.email}</strong></span>
+                        <button onclick="userManager.logout(); location.reload();" 
+                                style="padding: 5px 10px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            로그아웃
+                        </button>
+                    </div>
+                `;
+            } else {
+                authDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>⚠️ 피드백을 작성하려면 로그인이 필요합니다</span>
+                        <button onclick="userManager.login(); " 
+                                style="padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                            Google 로그인
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
         // Load on page load
         loadFeedbacks();
+        updateAuthStatus();
         
         // Auto refresh every 30 seconds
         setInterval(loadFeedbacks, 30000);
