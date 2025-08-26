@@ -29,8 +29,10 @@ class UserManager {
                 this.currentUser = session.user;
                 await this.loadUserProfile();
                 await this.checkSubscription();
-                await this.syncLocalDataToCloud();
-                window.location.reload();
+                // Don't reload immediately - let sync complete first
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500); // Give sync 1.5 seconds to complete
             } else if (event === 'SIGNED_OUT') {
                 this.currentUser = null;
                 this.userProfile = null;
@@ -166,66 +168,9 @@ class UserManager {
     }
 
     async syncLocalDataToCloud() {
-        if (!this.currentUser) return;
-
-        console.log('Starting initial sync after login...');
-        
-        // Instead of just saving local to cloud, we need to merge
-        // This prevents data loss when logging in from different devices
-        
-        try {
-            // Load cloud data first
-            const cloudTodos = await this.loadTodos();
-            const cloudMindmaps = await this.loadMindmaps();
-            
-            // Get local data
-            const localTodos = localStorage.getItem('tasks');
-            const localMindmaps = localStorage.getItem('mindMapBoards');
-            
-            // Merge todos if both exist
-            if (localTodos && cloudTodos) {
-                const localTodosParsed = JSON.parse(localTodos);
-                const mergedTodos = this.mergeData(localTodosParsed, cloudTodos);
-                await this.saveTodos(mergedTodos);
-                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
-            } else if (localTodos) {
-                await this.saveTodos(JSON.parse(localTodos));
-            } else if (cloudTodos) {
-                localStorage.setItem('tasks', JSON.stringify(cloudTodos));
-            }
-            
-            // Merge mindmaps if both exist
-            if (localMindmaps && cloudMindmaps) {
-                const localMindmapsParsed = JSON.parse(localMindmaps);
-                const mergedMindmaps = { ...cloudMindmaps, ...localMindmapsParsed };
-                await this.saveMindmaps(mergedMindmaps);
-                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
-            } else if (localMindmaps) {
-                await this.saveMindmaps(JSON.parse(localMindmaps));
-            } else if (cloudMindmaps) {
-                localStorage.setItem('mindMapBoards', JSON.stringify(cloudMindmaps));
-            }
-            
-            console.log('Initial sync completed successfully');
-        } catch (error) {
-            console.error('Initial sync failed:', error);
-        }
-    }
-    
-    mergeData(localData, cloudData) {
-        // Simple merge - combine arrays and remove duplicates by ID
-        const combined = [...(localData || []), ...(cloudData || [])];
-        const seen = new Set();
-        return combined.filter(item => {
-            if (item && item.id) {
-                if (seen.has(item.id)) {
-                    return false;
-                }
-                seen.add(item.id);
-                return true;
-            }
-            return true;
-        });
+        // This method is no longer needed - we handle sync in SyncManager
+        // Keeping it empty to avoid breaking existing calls
+        return;
     }
 
     async saveTodos(todos) {
@@ -339,40 +284,41 @@ class SyncManager {
         this.updateSyncStatus('syncing');
 
         try {
-            // Load data from both local and cloud, then merge
-            console.log('Loading and merging data...');
+            // SIMPLE APPROACH: Cloud is the source of truth
+            // Load data from cloud and update local
+            console.log('Loading data from cloud...');
             
-            // Load todos and merge
+            // Load todos from cloud
             const cloudTodos = await this.userManager.loadTodos();
-            const localTodos = localStorage.getItem('tasks');
-            const mergedTodos = this.mergeTodos(
-                localTodos ? JSON.parse(localTodos) : [],
-                cloudTodos || []
-            );
-            
-            // Save merged todos
-            if (mergedTodos && mergedTodos.length > 0) {
-                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
-                await this.userManager.saveTodos(mergedTodos);
+            if (cloudTodos && cloudTodos.length > 0) {
+                console.log('Loaded todos from cloud:', cloudTodos);
+                localStorage.setItem('tasks', JSON.stringify(cloudTodos));
                 if (window.updateTodoUI) {
                     window.updateTodoUI();
                 }
+            } else {
+                console.log('No todos in cloud, keeping local data');
+                // If no cloud data, save local to cloud
+                const localTodos = localStorage.getItem('tasks');
+                if (localTodos) {
+                    await this.userManager.saveTodos(JSON.parse(localTodos));
+                }
             }
 
-            // Load mindmaps and merge
+            // Load mindmaps from cloud
             const cloudMindmaps = await this.userManager.loadMindmaps();
-            const localMindmaps = localStorage.getItem('mindMapBoards');
-            const mergedMindmaps = this.mergeMindmaps(
-                localMindmaps ? JSON.parse(localMindmaps) : {},
-                cloudMindmaps || {}
-            );
-            
-            // Save merged mindmaps
-            if (mergedMindmaps && Object.keys(mergedMindmaps).length > 0) {
-                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
-                await this.userManager.saveMindmaps(mergedMindmaps);
+            if (cloudMindmaps && Object.keys(cloudMindmaps).length > 0) {
+                console.log('Loaded mindmaps from cloud:', cloudMindmaps);
+                localStorage.setItem('mindMapBoards', JSON.stringify(cloudMindmaps));
                 if (window.updateMindmapUI) {
                     window.updateMindmapUI();
+                }
+            } else {
+                console.log('No mindmaps in cloud, keeping local data');
+                // If no cloud data, save local to cloud
+                const localMindmaps = localStorage.getItem('mindMapBoards');
+                if (localMindmaps) {
+                    await this.userManager.saveMindmaps(JSON.parse(localMindmaps));
                 }
             }
 
@@ -464,45 +410,24 @@ class SyncManager {
         this.updateSyncStatus('syncing');
         
         try {
-            // Get current local data
+            // SIMPLE: Just save local data to cloud
+            // This ensures all devices see the same data
+            
             const localTodos = localStorage.getItem('tasks');
-            const localMindmaps = localStorage.getItem('mindMapBoards');
-            
-            // Get current cloud data
-            const cloudTodos = await this.userManager.loadTodos();
-            const cloudMindmaps = await this.userManager.loadMindmaps();
-            
-            // Merge todos
-            if (localTodos || cloudTodos) {
-                const mergedTodos = this.mergeTodos(
-                    localTodos ? JSON.parse(localTodos) : [],
-                    cloudTodos || []
-                );
-                
-                // Save merged data
-                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
-                await this.userManager.saveTodos(mergedTodos);
-                
-                // Update UI if needed
-                if (window.updateTodoUI) {
-                    window.updateTodoUI();
+            if (localTodos) {
+                const todos = JSON.parse(localTodos);
+                if (todos.length > 0) {
+                    await this.userManager.saveTodos(todos);
+                    console.log('Saved todos to cloud:', todos);
                 }
             }
             
-            // Merge mindmaps
-            if (localMindmaps || cloudMindmaps) {
-                const mergedMindmaps = this.mergeMindmaps(
-                    localMindmaps ? JSON.parse(localMindmaps) : {},
-                    cloudMindmaps || {}
-                );
-                
-                // Save merged data
-                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
-                await this.userManager.saveMindmaps(mergedMindmaps);
-                
-                // Update UI if needed
-                if (window.updateMindmapUI) {
-                    window.updateMindmapUI();
+            const localMindmaps = localStorage.getItem('mindMapBoards');
+            if (localMindmaps) {
+                const mindmaps = JSON.parse(localMindmaps);
+                if (Object.keys(mindmaps).length > 0) {
+                    await this.userManager.saveMindmaps(mindmaps);
+                    console.log('Saved mindmaps to cloud:', mindmaps);
                 }
             }
             
