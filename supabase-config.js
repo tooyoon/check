@@ -247,14 +247,19 @@ class SyncManager {
     }
 
     async initializeSync() {
-        if (!this.userManager.isLoggedIn()) return;
+        if (!this.userManager.isLoggedIn()) {
+            console.log('User not logged in, skipping sync initialization');
+            return;
+        }
 
-        console.log('Initializing sync...');
+        console.log('Initializing sync...', this.userManager.currentUser);
         this.updateSyncStatus('syncing');
 
         try {
             // Load initial data from Supabase
+            console.log('Loading todos from Supabase...');
             const todos = await this.userManager.loadTodos();
+            console.log('Todos loaded:', todos);
             if (todos && todos.length > 0) {
                 localStorage.setItem('tasks', JSON.stringify(todos));
                 if (window.updateTodoUI) {
@@ -262,7 +267,9 @@ class SyncManager {
                 }
             }
 
+            console.log('Loading mindmaps from Supabase...');
             const mindmaps = await this.userManager.loadMindmaps();
+            console.log('Mindmaps loaded:', mindmaps);
             if (mindmaps) {
                 localStorage.setItem('mindMapBoards', JSON.stringify(mindmaps));
                 if (window.updateMindmapUI) {

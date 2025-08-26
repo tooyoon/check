@@ -1638,8 +1638,21 @@
                         }
                         
                         // Initialize sync manager
-                        await syncManager.initializeSync();
-                        console.log('Sync initialized successfully');
+                        try {
+                            await syncManager.initializeSync();
+                            console.log('Sync initialized successfully');
+                        } catch (error) {
+                            console.error('Sync initialization error:', error);
+                            // Still allow local mode
+                            const indicator = document.getElementById('sync-indicator');
+                            if (indicator) {
+                                indicator.className = 'sync-indicator offline';
+                                const statusText = indicator.querySelector('.sync-text');
+                                if (statusText) {
+                                    statusText.textContent = '로컬 모드 (동기화 실패)';
+                                }
+                            }
+                        }
                     } else {
                         console.log('No active session found');
                         // Show auth screen for new users or offer local storage option
