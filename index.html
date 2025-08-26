@@ -1535,8 +1535,14 @@
                     <button
                         onClick={async () => {
                             if (confirm('로그아웃 하시겠습니까?')) {
-                                await userManager.signOut();
-                                window.location.reload();
+                                try {
+                                    await userManager.signOut();
+                                } catch (error) {
+                                    console.error('Logout error:', error);
+                                } finally {
+                                    // Always reload regardless of signOut result
+                                    window.location.href = window.location.href;
+                                }
                             }
                         }}
                         className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all duration-200 text-sm font-medium"
@@ -1572,8 +1578,13 @@
                             </button>
                             <button
                                 onClick={async () => {
-                                    await userManager.signOut();
-                                    window.location.reload();
+                                    try {
+                                        await userManager.signOut();
+                                    } catch (error) {
+                                        console.error('Logout error:', error);
+                                    } finally {
+                                        window.location.href = window.location.href;
+                                    }
                                 }}
                                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             >
