@@ -168,17 +168,64 @@ class UserManager {
     async syncLocalDataToCloud() {
         if (!this.currentUser) return;
 
-        // Sync TodoMaster data
-        const localTodos = localStorage.getItem('tasks');
-        if (localTodos) {
-            await this.saveTodos(JSON.parse(localTodos));
+        console.log('Starting initial sync after login...');
+        
+        // Instead of just saving local to cloud, we need to merge
+        // This prevents data loss when logging in from different devices
+        
+        try {
+            // Load cloud data first
+            const cloudTodos = await this.loadTodos();
+            const cloudMindmaps = await this.loadMindmaps();
+            
+            // Get local data
+            const localTodos = localStorage.getItem('tasks');
+            const localMindmaps = localStorage.getItem('mindMapBoards');
+            
+            // Merge todos if both exist
+            if (localTodos && cloudTodos) {
+                const localTodosParsed = JSON.parse(localTodos);
+                const mergedTodos = this.mergeData(localTodosParsed, cloudTodos);
+                await this.saveTodos(mergedTodos);
+                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
+            } else if (localTodos) {
+                await this.saveTodos(JSON.parse(localTodos));
+            } else if (cloudTodos) {
+                localStorage.setItem('tasks', JSON.stringify(cloudTodos));
+            }
+            
+            // Merge mindmaps if both exist
+            if (localMindmaps && cloudMindmaps) {
+                const localMindmapsParsed = JSON.parse(localMindmaps);
+                const mergedMindmaps = { ...cloudMindmaps, ...localMindmapsParsed };
+                await this.saveMindmaps(mergedMindmaps);
+                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
+            } else if (localMindmaps) {
+                await this.saveMindmaps(JSON.parse(localMindmaps));
+            } else if (cloudMindmaps) {
+                localStorage.setItem('mindMapBoards', JSON.stringify(cloudMindmaps));
+            }
+            
+            console.log('Initial sync completed successfully');
+        } catch (error) {
+            console.error('Initial sync failed:', error);
         }
-
-        // Sync MindMap data
-        const localMindmaps = localStorage.getItem('mindMapBoards');
-        if (localMindmaps) {
-            await this.saveMindmaps(JSON.parse(localMindmaps));
-        }
+    }
+    
+    mergeData(localData, cloudData) {
+        // Simple merge - combine arrays and remove duplicates by ID
+        const combined = [...(localData || []), ...(cloudData || [])];
+        const seen = new Set();
+        return combined.filter(item => {
+            if (item && item.id) {
+                if (seen.has(item.id)) {
+                    return false;
+                }
+                seen.add(item.id);
+                return true;
+            }
+            return true;
+        });
     }
 
     async saveTodos(todos) {
@@ -292,22 +339,38 @@ class SyncManager {
         this.updateSyncStatus('syncing');
 
         try {
-            // Load initial data from Supabase
-            console.log('Loading todos from Supabase...');
-            const todos = await this.userManager.loadTodos();
-            console.log('Todos loaded:', todos);
-            if (todos && todos.length > 0) {
-                localStorage.setItem('tasks', JSON.stringify(todos));
+            // Load data from both local and cloud, then merge
+            console.log('Loading and merging data...');
+            
+            // Load todos and merge
+            const cloudTodos = await this.userManager.loadTodos();
+            const localTodos = localStorage.getItem('tasks');
+            const mergedTodos = this.mergeTodos(
+                localTodos ? JSON.parse(localTodos) : [],
+                cloudTodos || []
+            );
+            
+            // Save merged todos
+            if (mergedTodos && mergedTodos.length > 0) {
+                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
+                await this.userManager.saveTodos(mergedTodos);
                 if (window.updateTodoUI) {
                     window.updateTodoUI();
                 }
             }
 
-            console.log('Loading mindmaps from Supabase...');
-            const mindmaps = await this.userManager.loadMindmaps();
-            console.log('Mindmaps loaded:', mindmaps);
-            if (mindmaps) {
-                localStorage.setItem('mindMapBoards', JSON.stringify(mindmaps));
+            // Load mindmaps and merge
+            const cloudMindmaps = await this.userManager.loadMindmaps();
+            const localMindmaps = localStorage.getItem('mindMapBoards');
+            const mergedMindmaps = this.mergeMindmaps(
+                localMindmaps ? JSON.parse(localMindmaps) : {},
+                cloudMindmaps || {}
+            );
+            
+            // Save merged mindmaps
+            if (mergedMindmaps && Object.keys(mergedMindmaps).length > 0) {
+                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
+                await this.userManager.saveMindmaps(mergedMindmaps);
                 if (window.updateMindmapUI) {
                     window.updateMindmapUI();
                 }
@@ -400,20 +463,55 @@ class SyncManager {
     async syncAll() {
         this.updateSyncStatus('syncing');
         
-        // Sync todos
-        const todos = localStorage.getItem('tasks');
-        if (todos) {
-            await this.userManager.saveTodos(JSON.parse(todos));
+        try {
+            // Get current local data
+            const localTodos = localStorage.getItem('tasks');
+            const localMindmaps = localStorage.getItem('mindMapBoards');
+            
+            // Get current cloud data
+            const cloudTodos = await this.userManager.loadTodos();
+            const cloudMindmaps = await this.userManager.loadMindmaps();
+            
+            // Merge todos
+            if (localTodos || cloudTodos) {
+                const mergedTodos = this.mergeTodos(
+                    localTodos ? JSON.parse(localTodos) : [],
+                    cloudTodos || []
+                );
+                
+                // Save merged data
+                localStorage.setItem('tasks', JSON.stringify(mergedTodos));
+                await this.userManager.saveTodos(mergedTodos);
+                
+                // Update UI if needed
+                if (window.updateTodoUI) {
+                    window.updateTodoUI();
+                }
+            }
+            
+            // Merge mindmaps
+            if (localMindmaps || cloudMindmaps) {
+                const mergedMindmaps = this.mergeMindmaps(
+                    localMindmaps ? JSON.parse(localMindmaps) : {},
+                    cloudMindmaps || {}
+                );
+                
+                // Save merged data
+                localStorage.setItem('mindMapBoards', JSON.stringify(mergedMindmaps));
+                await this.userManager.saveMindmaps(mergedMindmaps);
+                
+                // Update UI if needed
+                if (window.updateMindmapUI) {
+                    window.updateMindmapUI();
+                }
+            }
+            
+            this.lastSyncTime = new Date();
+            this.updateSyncStatus('synced');
+        } catch (error) {
+            console.error('Sync failed:', error);
+            this.updateSyncStatus('offline');
         }
-
-        // Sync mindmaps
-        const mindmaps = localStorage.getItem('mindMapBoards');
-        if (mindmaps) {
-            await this.userManager.saveMindmaps(JSON.parse(mindmaps));
-        }
-
-        this.lastSyncTime = new Date();
-        this.updateSyncStatus('synced');
     }
 
     updateSyncStatus(status) {
@@ -453,6 +551,66 @@ class SyncManager {
         updateUI();
     }
 
+    mergeTodos(localTodos, cloudTodos) {
+        // Create a map of todos by ID for efficient merging
+        const todoMap = new Map();
+        
+        // Add cloud todos first
+        cloudTodos.forEach(todo => {
+            if (todo && todo.id) {
+                todoMap.set(todo.id, todo);
+            }
+        });
+        
+        // Add or update with local todos (local takes priority for recent changes)
+        localTodos.forEach(todo => {
+            if (todo && todo.id) {
+                const cloudTodo = todoMap.get(todo.id);
+                if (!cloudTodo) {
+                    // New local todo
+                    todoMap.set(todo.id, todo);
+                } else {
+                    // Compare timestamps if available, otherwise prefer local
+                    const localTime = todo.updatedAt ? new Date(todo.updatedAt).getTime() : Date.now();
+                    const cloudTime = cloudTodo.updatedAt ? new Date(cloudTodo.updatedAt).getTime() : 0;
+                    
+                    if (localTime >= cloudTime) {
+                        todoMap.set(todo.id, todo);
+                    }
+                }
+            }
+        });
+        
+        // Convert map back to array
+        return Array.from(todoMap.values());
+    }
+    
+    mergeMindmaps(localMindmaps, cloudMindmaps) {
+        // For mindmaps, merge at the board level
+        const merged = { ...cloudMindmaps };
+        
+        // Add or update with local mindmaps
+        Object.keys(localMindmaps).forEach(boardId => {
+            if (!merged[boardId]) {
+                // New local board
+                merged[boardId] = localMindmaps[boardId];
+            } else {
+                // Compare timestamps if available
+                const localBoard = localMindmaps[boardId];
+                const cloudBoard = merged[boardId];
+                
+                const localTime = localBoard.updatedAt ? new Date(localBoard.updatedAt).getTime() : Date.now();
+                const cloudTime = cloudBoard.updatedAt ? new Date(cloudBoard.updatedAt).getTime() : 0;
+                
+                if (localTime >= cloudTime) {
+                    merged[boardId] = localBoard;
+                }
+            }
+        });
+        
+        return merged;
+    }
+    
     cleanup() {
         if (this.todoSubscription) {
             supabase.removeChannel(this.todoSubscription);
