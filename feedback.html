@@ -160,6 +160,17 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         
+        .feedback-count {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
         .feedback-item {
             border-bottom: 1px solid #e1e8ed;
             padding: 20px 0;
@@ -313,10 +324,10 @@
         
         <div class="header">
             <h1>
-                💬 피드백
+                💬 피드백 게시판
                 <span style="font-size: 0.5em; opacity: 0.8;">Beta</span>
             </h1>
-            <p>CheckMaster를 더 좋게 만들어주세요!</p>
+            <p>CheckMaster를 더 좋게 만들어주세요! 건의사항, 버그, 아이디어를 공유해주세요.</p>
         </div>
         
         <div class="feedback-form">
@@ -354,7 +365,18 @@
         </div>
         
         <div class="feedback-list">
-            <h2 style="margin-bottom: 20px;">📋 다른 사용자들의 피드백</h2>
+            <h2 style="margin-bottom: 20px;">📋 커뮤니티 피드백</h2>
+            
+            <div class="feedback-count">
+                <div>
+                    <strong id="totalCount">0</strong>개의 피드백
+                </div>
+                <div style="font-size: 14px;">
+                    🐛 버그: <span id="bugCount">0</span> | 
+                    ✨ 기능: <span id="featureCount">0</span> | 
+                    💡 개선: <span id="improvementCount">0</span>
+                </div>
+            </div>
             
             <div class="filter-tabs">
                 <button class="filter-tab active" data-filter="all">전체</button>
@@ -473,8 +495,22 @@
             displayFeedbacks();
         }
         
+        // Update statistics
+        function updateStats() {
+            const total = feedbacks.length;
+            const bugs = feedbacks.filter(f => f.category === 'bug').length;
+            const features = feedbacks.filter(f => f.category === 'feature').length;
+            const improvements = feedbacks.filter(f => f.category === 'improvement').length;
+            
+            document.getElementById('totalCount').textContent = total;
+            document.getElementById('bugCount').textContent = bugs;
+            document.getElementById('featureCount').textContent = features;
+            document.getElementById('improvementCount').textContent = improvements;
+        }
+        
         // Display feedbacks
         function displayFeedbacks() {
+            updateStats();
             const container = document.getElementById('feedbackList');
             const filtered = currentFilter === 'all' 
                 ? feedbacks 
