@@ -303,10 +303,6 @@ class SyncManager {
                 if (window.updateTodoUI) {
                     window.updateTodoUI();
                 }
-                // Force reload to ensure UI updates
-                if (window.location.pathname.includes('index.html') || window.location.pathname === '/') {
-                    window.location.reload();
-                }
             } else {
                 console.log('No todos in cloud, saving local data');
                 // Save local data to cloud
@@ -399,9 +395,6 @@ class SyncManager {
         if (window.updateTodoUI) {
             window.updateTodoUI();
         }
-        
-        // Force reload to ensure UI updates with new data
-        window.location.reload();
         
         this.updateSyncStatus('synced');
     }
