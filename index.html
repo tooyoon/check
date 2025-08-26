@@ -1866,13 +1866,25 @@
                 return result;
             }, [tasks, selectedCat, debouncedQuery, statusFilter, prioFilter, sortBy]);
 
+            // Random emoji generator for categories
+            function getRandomCategoryEmoji() {
+                const categoryEmojis = [
+                    "📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️", 
+                    "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
+                    "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
+                    "🔮", "💎", "🎯", "🎨", "🎭", "🎪", "🎲", "🎯",
+                    "⭐", "🌟", "💫", "✨", "🔥", "💥", "⚡", "🌈"
+                ];
+                return categoryEmojis[Math.floor(Math.random() * categoryEmojis.length)];
+            }
+
             // Actions
             async function addCategory() {
                 if (!newCatName.trim()) return;
                 const cat = {
                     id: uid(),
                     name: newCatName.trim(),
-                    emoji: "📁",
+                    emoji: getRandomCategoryEmoji(),
                     builtin: false,
                 };
                 await db.saveCategory(cat);
@@ -2412,14 +2424,14 @@
                                                         value={editCatEmoji}
                                                         onChange={(e) => setEditCatEmoji(e.target.value)}
                                                         placeholder="🏷️"
-                                                        className="w-12 px-2 py-1 border rounded text-center"
+                                                        className="w-12 px-2 py-1 border rounded text-center text-gray-800 bg-white"
                                                         maxLength={2}
                                                     />
                                                     <input
                                                         value={editCatName}
                                                         onChange={(e) => setEditCatName(e.target.value)}
                                                         placeholder="카테고리 이름"
-                                                        className="flex-1 px-2 py-1 border rounded"
+                                                        className="flex-1 px-2 py-1 border rounded text-gray-800 bg-white"
                                                         autoFocus
                                                         onKeyDown={(e) => {
                                                             if (e.key === "Enter") saveEditCategory();

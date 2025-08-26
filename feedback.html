@@ -356,6 +356,11 @@
                 </div>
                 
                 <div class="form-group">
+                    <label for="name">이름 (선택)</label>
+                    <input type="text" id="name" placeholder="이름 또는 닉네임">
+                </div>
+                
+                <div class="form-group">
                     <label for="email">이메일 (선택)</label>
                     <input type="email" id="email" placeholder="답변을 원하시면 이메일을 남겨주세요">
                 </div>
@@ -366,6 +371,15 @@
         
         <div class="feedback-list">
             <h2 style="margin-bottom: 20px;">📋 커뮤니티 피드백</h2>
+            
+            <!-- Search Bar -->
+            <div style="margin-bottom: 20px;">
+                <input type="text" 
+                       id="searchInput" 
+                       placeholder="🔍 피드백 검색..." 
+                       style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; background: white;"
+                       onkeyup="searchFeedbacks()">
+            </div>
             
             <div class="feedback-count">
                 <div>
@@ -432,6 +446,7 @@
             
             const title = document.getElementById('title').value;
             const content = document.getElementById('content').value;
+            const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
             
             // Save to Supabase
@@ -442,6 +457,7 @@
                         category: selectedCategory,
                         title: title,
                         content: content,
+                        name: name || null,
                         email: email || null,
                         user_id: userManager.currentUser?.id || null,
                         votes: 0,
@@ -508,13 +524,52 @@
             document.getElementById('improvementCount').textContent = improvements;
         }
         
+        // Search feedbacks
+        let searchQuery = '';
+        
+        function searchFeedbacks() {
+            searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            displayFeedbacks();
+        }
+        
+        // Highlight feedback
+        function highlightFeedback(id) {
+            // Remove previous highlights
+            document.querySelectorAll('.feedback-item').forEach(item => {
+                item.style.background = '';
+                item.style.boxShadow = '';
+                item.style.transform = '';
+            });
+            
+            // Add highlight to clicked item
+            const element = document.getElementById(`feedback-${id}`);
+            if (element) {
+                element.style.background = 'linear-gradient(135deg, #667eea15 0%, #764ba215 100%)';
+                element.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.3)';
+                element.style.transform = 'scale(1.02)';
+                
+                // Scroll to element
+                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
         // Display feedbacks
         function displayFeedbacks() {
             updateStats();
             const container = document.getElementById('feedbackList');
-            const filtered = currentFilter === 'all' 
+            let filtered = currentFilter === 'all' 
                 ? feedbacks 
                 : feedbacks.filter(f => f.category === currentFilter);
+            
+            // Apply search filter
+            if (searchQuery) {
+                filtered = filtered.filter(f => 
+                    f.title.toLowerCase().includes(searchQuery) || 
+                    f.content.toLowerCase().includes(searchQuery) ||
+                    (f.name && f.name.toLowerCase().includes(searchQuery)) ||
+                    (f.email && f.email.toLowerCase().includes(searchQuery))
+                );
+            }
             
             if (filtered.length === 0) {
                 container.innerHTML = `
@@ -527,7 +582,7 @@
             }
             
             container.innerHTML = filtered.map(feedback => `
-                <div class="feedback-item">
+                <div class="feedback-item" id="feedback-${feedback.id}" onclick="highlightFeedback('${feedback.id}')" style="cursor: pointer; transition: all 0.3s ease;">
                     <div class="feedback-header">
                         <div>
                             <span class="feedback-category category-${feedback.category}">
@@ -547,6 +602,7 @@
                         ${escapeHtml(feedback.content).replace(/\n/g, '<br>')}
                     </div>
                     <div class="feedback-meta">
+                        <span>👤 ${feedback.name ? escapeHtml(feedback.name) : (feedback.email ? escapeHtml(feedback.email.split('@')[0]) : '익명')}</span>
                         <span>${formatDate(feedback.created_at)}</span>
                         ${feedback.email ? '<span>✉️ 답변 요청</span>' : ''}
                     </div>

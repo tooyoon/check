@@ -11,6 +11,7 @@ CREATE TABLE feedbacks (
     category TEXT NOT NULL CHECK (category IN ('bug', 'feature', 'improvement', 'other')),
     title TEXT NOT NULL,
     content TEXT NOT NULL,
+    name TEXT,
     email TEXT,
     votes INTEGER DEFAULT 0,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewing', 'resolved', 'rejected')),
