@@ -12,6 +12,31 @@
     <script src="supabase-config.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
     
+    <script>
+        // 모바일 인앱 브라우저 감지 및 처리
+        (function() {
+            const ua = navigator.userAgent.toLowerCase();
+            const isInAppBrowser = ua.includes('kakaotalk') || 
+                                  ua.includes('naver') || 
+                                  ua.includes('facebook') || 
+                                  ua.includes('instagram') ||
+                                  ua.includes('line') ||
+                                  (ua.includes('mobile') && ua.includes('wv'));
+            
+            // 로그인되지 않은 상태에서 인앱 브라우저 접속 시 모바일 로그인 페이지로
+            if (isInAppBrowser && !localStorage.getItem('supabase.auth.token')) {
+                // Hash fragment에 access_token이 없으면 리다이렉트
+                if (!window.location.hash.includes('access_token')) {
+                    console.log('인앱 브라우저 감지 - 모바일 로그인 페이지로 이동');
+                    // 현재 페이지가 mobile-login.html이 아닐 때만 리다이렉트
+                    if (!window.location.pathname.includes('mobile-login.html')) {
+                        window.location.href = '/mobile-login.html';
+                    }
+                }
+            }
+        })();
+    </script>
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
