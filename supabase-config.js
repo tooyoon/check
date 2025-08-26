@@ -119,14 +119,24 @@ class UserManager {
     async checkSubscription() {
         if (!this.currentUser) return;
 
-        const { data: subscription } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', this.currentUser.id)
-            .eq('status', 'active')
-            .single();
+        try {
+            const { data: subscription, error } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', this.currentUser.id)
+                .eq('status', 'active')
+                .single();
 
-        this.subscription = subscription;
+            if (error) {
+                console.log('Subscription check error (expected if no subscription):', error.message);
+                this.subscription = null;
+            } else {
+                this.subscription = subscription;
+            }
+        } catch (err) {
+            console.log('Subscription check failed:', err);
+            this.subscription = null;
+        }
     }
 
     async syncLocalDataToCloud() {
@@ -311,12 +321,16 @@ class SyncManager {
                 )
                 .subscribe();
 
+            // Successfully initialized
             this.syncStatus = 'online';
-            this.updateSyncStatus('synced');
             this.startAutoSync();
             
             // Save current data to cloud
             await this.syncAll();
+            
+            // Update status to synced after everything is done
+            this.updateSyncStatus('synced');
+            console.log('Sync status updated to synced');
             
         } catch (error) {
             console.error('Sync initialization failed:', error);
