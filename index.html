@@ -821,12 +821,25 @@
                     this.data.categories.push(category);
                 }
                 await this.saveData();
+                
+                // Sync to Supabase if logged in
+                if (window.userManager && window.userManager.isLoggedIn()) {
+                    await window.userManager.saveCategories(this.data.categories);
+                    window.syncManager.updateSyncStatus('synced');
+                }
             }
 
             async deleteCategory(id) {
                 this.data.categories = this.data.categories.filter(c => c.id !== id);
                 this.data.tasks = this.data.tasks.filter(t => t.categoryId !== id);
                 await this.saveData();
+                
+                // Sync to Supabase if logged in
+                if (window.userManager && window.userManager.isLoggedIn()) {
+                    await window.userManager.saveCategories(this.data.categories);
+                    await window.userManager.saveTodos(this.data.tasks);
+                    window.syncManager.updateSyncStatus('synced');
+                }
             }
 
             async saveTask(task) {

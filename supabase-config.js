@@ -207,6 +207,40 @@ class UserManager {
         return data.data;
     }
 
+    async saveCategories(categories) {
+        if (!this.currentUser) return;
+
+        const { error } = await supabase
+            .from('categories')
+            .upsert({
+                user_id: this.currentUser.id,
+                data: categories,
+                updated_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id'
+            });
+
+        if (error) {
+            console.error('Categories save error:', error);
+        }
+    }
+
+    async loadCategories() {
+        if (!this.currentUser) return null;
+
+        const { data, error } = await supabase
+            .from('categories')
+            .select('data')
+            .eq('user_id', this.currentUser.id)
+            .single();
+
+        if (error || !data) {
+            return null;
+        }
+
+        return data.data;
+    }
+
     async saveMindmaps(mindmaps) {
         if (!this.currentUser) return;
 
@@ -288,27 +322,34 @@ class SyncManager {
             const localData = localStorage.getItem('todoMasterApp');
             let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
             
+            // Load categories from cloud
+            const cloudCategories = await this.userManager.loadCategories();
+            if (cloudCategories && cloudCategories.length > 0) {
+                console.log('Loaded categories from cloud:', cloudCategories);
+                appData.categories = cloudCategories;
+            } else if (appData.categories && appData.categories.length > 0) {
+                console.log('No categories in cloud, saving local data');
+                await this.userManager.saveCategories(appData.categories);
+            }
+            
             // Load todos from cloud
             const cloudTodos = await this.userManager.loadTodos();
-            
             if (cloudTodos && cloudTodos.length > 0) {
                 console.log('Loaded todos from cloud:', cloudTodos);
-                // Update the local app data with cloud todos
                 appData.tasks = cloudTodos;
-                localStorage.setItem('todoMasterApp', JSON.stringify(appData));
-                
-                // Also update the old 'tasks' key for compatibility
-                localStorage.setItem('tasks', JSON.stringify(cloudTodos));
-                
-                if (window.updateTodoUI) {
-                    window.updateTodoUI();
-                }
-            } else {
+            } else if (appData.tasks && appData.tasks.length > 0) {
                 console.log('No todos in cloud, saving local data');
-                // Save local data to cloud
-                if (appData.tasks && appData.tasks.length > 0) {
-                    await this.userManager.saveTodos(appData.tasks);
-                }
+                await this.userManager.saveTodos(appData.tasks);
+            }
+            
+            // Save updated app data
+            localStorage.setItem('todoMasterApp', JSON.stringify(appData));
+            
+            // Also update the old 'tasks' key for compatibility
+            localStorage.setItem('tasks', JSON.stringify(appData.tasks));
+            
+            if (window.updateTodoUI) {
+                window.updateTodoUI();
             }
 
             // Load mindmaps from cloud
@@ -428,6 +469,14 @@ class SyncManager {
             const localData = localStorage.getItem('todoMasterApp');
             if (localData) {
                 const appData = JSON.parse(localData);
+                
+                // Save categories
+                if (appData.categories && appData.categories.length > 0) {
+                    await this.userManager.saveCategories(appData.categories);
+                    console.log('Saved categories to cloud:', appData.categories);
+                }
+                
+                // Save todos
                 if (appData.tasks && appData.tasks.length > 0) {
                     await this.userManager.saveTodos(appData.tasks);
                     console.log('Saved todos to cloud:', appData.tasks);

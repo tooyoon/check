@@ -4,6 +4,7 @@
 -- 기존 테이블 삭제 (있으면)
 DROP TABLE IF EXISTS todos CASCADE;
 DROP TABLE IF EXISTS mindmaps CASCADE;
+DROP TABLE IF EXISTS categories CASCADE;
 DROP TABLE IF EXISTS user_profiles CASCADE;
 DROP TABLE IF EXISTS user_stats CASCADE;
 DROP TABLE IF EXISTS subscriptions CASCADE;
@@ -38,6 +39,14 @@ CREATE TABLE mindmaps (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- categories 테이블
+CREATE TABLE categories (
+    user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    data JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- user_stats 테이블
 CREATE TABLE user_stats (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -59,6 +68,7 @@ CREATE TABLE subscriptions (
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE todos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mindmaps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 
@@ -81,6 +91,11 @@ CREATE POLICY "Enable all for users based on user_id" ON mindmaps
     FOR ALL USING (auth.uid() = user_id)
     WITH CHECK (auth.uid() = user_id);
 
+-- categories
+CREATE POLICY "Enable all for users based on user_id" ON categories
+    FOR ALL USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
 -- user_stats
 CREATE POLICY "Enable all for users based on user_id" ON user_stats
     FOR ALL USING (auth.uid() = user_id)
@@ -93,6 +108,7 @@ CREATE POLICY "Users can view own subscription" ON subscriptions
 -- 인덱스 생성
 CREATE INDEX idx_todos_user_id ON todos(user_id);
 CREATE INDEX idx_mindmaps_user_id ON mindmaps(user_id);
+CREATE INDEX idx_categories_user_id ON categories(user_id);
 CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
 
 -- 트리거: updated_at 자동 업데이트
@@ -108,4 +124,7 @@ CREATE TRIGGER update_todos_updated_at BEFORE UPDATE ON todos
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TRIGGER update_mindmaps_updated_at BEFORE UPDATE ON mindmaps
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
