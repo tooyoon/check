@@ -284,6 +284,7 @@ class SyncManager {
             .subscribe();
 
         this.syncStatus = 'online';
+        this.updateSyncStatus('synced');
         this.startAutoSync();
     }
 
@@ -346,6 +347,12 @@ class SyncManager {
         const indicator = document.getElementById('sync-indicator');
         if (indicator) {
             indicator.className = `sync-indicator ${status}`;
+            const statusText = indicator.querySelector('.sync-text') || indicator.querySelector('span:last-child');
+            if (statusText) {
+                statusText.textContent = status === 'synced' ? '동기화됨' : 
+                                        status === 'syncing' ? '동기화 중' : 
+                                        status === 'online' ? '온라인' : '오프라인';
+            }
             indicator.title = `Last sync: ${this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never'}`;
         }
     }
