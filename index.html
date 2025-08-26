@@ -829,7 +829,6 @@
                 if (window.userManager && window.userManager.isLoggedIn()) {
                     await window.userManager.saveCategories(this.data.categories);
                     window.syncManager.updateSyncStatus('synced');
-                    console.log('Category saved and synced to cloud');
                 }
             }
 
@@ -864,7 +863,6 @@
                     await window.userManager.saveCategories(this.data.categories);
                     await window.userManager.saveTodos(this.data.tasks);
                     window.syncManager.updateSyncStatus('synced');
-                    console.log('Task saved and synced to cloud');
                 }
             }
 
@@ -882,7 +880,6 @@
                     await window.userManager.saveCategories(this.data.categories);
                     await window.userManager.saveTodos(this.data.tasks);
                     window.syncManager.updateSyncStatus('synced');
-                    console.log('Task deleted and synced to cloud');
                 }
             }
 

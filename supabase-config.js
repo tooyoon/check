@@ -314,7 +314,7 @@ class SyncManager {
             return;
         }
 
-        console.log('Initializing sync...', this.userManager.currentUser);
+        // Initialize sync silently
         this.updateSyncStatus('syncing');
 
         try {
@@ -325,20 +325,20 @@ class SyncManager {
             // Load categories from cloud
             const cloudCategories = await this.userManager.loadCategories();
             if (cloudCategories && cloudCategories.length > 0) {
-                console.log('Loaded categories from cloud:', cloudCategories);
+                // Categories loaded from cloud
                 appData.categories = cloudCategories;
             } else if (appData.categories && appData.categories.length > 0) {
-                console.log('No categories in cloud, saving local data');
+                // No categories in cloud, save local data
                 await this.userManager.saveCategories(appData.categories);
             }
             
             // Load todos from cloud
             const cloudTodos = await this.userManager.loadTodos();
             if (cloudTodos && cloudTodos.length > 0) {
-                console.log('Loaded todos from cloud:', cloudTodos);
+                // Todos loaded from cloud
                 appData.tasks = cloudTodos;
             } else if (appData.tasks && appData.tasks.length > 0) {
-                console.log('No todos in cloud, saving local data');
+                // No todos in cloud, save local data
                 await this.userManager.saveTodos(appData.tasks);
             }
             
@@ -507,15 +507,27 @@ class SyncManager {
     }
 
     startAutoSync() {
-        // Auto sync every 5 seconds for better real-time experience
+        // Auto sync periodically, but only if data has changed
         setInterval(() => {
             if (this.userManager.isLoggedIn() && this.userManager.userProfile?.settings?.auto_sync) {
-                this.syncAll();
+                this.syncAll(); // Will only sync if data changed
             }
-        }, 5000); // Changed from 30 seconds to 5 seconds
+        }, 10000); // Every 10 seconds, check if sync needed
     }
 
     async syncAll() {
+        // Don't sync if already syncing
+        if (this.syncStatus === 'syncing') {
+            return;
+        }
+        
+        // Check if data has changed since last sync
+        const currentDataHash = this.getDataHash();
+        if (this.lastDataHash === currentDataHash) {
+            // No changes, skip sync
+            return;
+        }
+        
         this.updateSyncStatus('syncing');
         
         try {
@@ -524,16 +536,14 @@ class SyncManager {
             if (localData) {
                 const appData = JSON.parse(localData);
                 
-                // Save categories
+                // Save categories if they exist
                 if (appData.categories && appData.categories.length > 0) {
                     await this.userManager.saveCategories(appData.categories);
-                    console.log('Saved categories to cloud:', appData.categories);
                 }
                 
-                // Save todos
+                // Save todos if they exist
                 if (appData.tasks && appData.tasks.length > 0) {
                     await this.userManager.saveTodos(appData.tasks);
-                    console.log('Saved todos to cloud:', appData.tasks);
                 }
             }
             
@@ -542,21 +552,31 @@ class SyncManager {
                 const mindmaps = JSON.parse(localMindmaps);
                 if (Object.keys(mindmaps).length > 0) {
                     await this.userManager.saveMindmaps(mindmaps);
-                    console.log('Saved mindmaps to cloud:', mindmaps);
                 }
             }
             
             this.lastSyncTime = new Date();
+            this.lastDataHash = currentDataHash;
             this.updateSyncStatus('synced');
         } catch (error) {
             console.error('Sync failed:', error);
             this.updateSyncStatus('offline');
         }
     }
+    
+    getDataHash() {
+        // Create a simple hash of current data to detect changes
+        const localData = localStorage.getItem('todoMasterApp');
+        const mindmaps = localStorage.getItem('mindMapBoards');
+        return JSON.stringify(localData) + JSON.stringify(mindmaps);
+    }
 
     updateSyncStatus(status) {
         this.syncStatus = status;
-        console.log('Updating sync status to:', status);
+        // Only log important status changes
+        if (status === 'offline' || status === 'error') {
+            console.log('Sync status:', status);
+        }
         
         // Update UI indicator - try multiple times to ensure DOM is ready
         const updateUI = () => {
