@@ -249,43 +249,72 @@ class SyncManager {
     async initializeSync() {
         if (!this.userManager.isLoggedIn()) return;
 
-        // Subscribe to todo changes
-        this.todoSubscription = supabase
-            .channel('todos-channel')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'todos',
-                    filter: `user_id=eq.${this.userManager.currentUser.id}`
-                },
-                (payload) => {
-                    this.handleTodoUpdate(payload.new);
-                }
-            )
-            .subscribe();
+        console.log('Initializing sync...');
+        this.updateSyncStatus('syncing');
 
-        // Subscribe to mindmap changes
-        this.mindmapSubscription = supabase
-            .channel('mindmaps-channel')
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'mindmaps',
-                    filter: `user_id=eq.${this.userManager.currentUser.id}`
-                },
-                (payload) => {
-                    this.handleMindmapUpdate(payload.new);
+        try {
+            // Load initial data from Supabase
+            const todos = await this.userManager.loadTodos();
+            if (todos && todos.length > 0) {
+                localStorage.setItem('tasks', JSON.stringify(todos));
+                if (window.updateTodoUI) {
+                    window.updateTodoUI();
                 }
-            )
-            .subscribe();
+            }
 
-        this.syncStatus = 'online';
-        this.updateSyncStatus('synced');
-        this.startAutoSync();
+            const mindmaps = await this.userManager.loadMindmaps();
+            if (mindmaps) {
+                localStorage.setItem('mindMapBoards', JSON.stringify(mindmaps));
+                if (window.updateMindmapUI) {
+                    window.updateMindmapUI();
+                }
+            }
+
+            // Subscribe to todo changes
+            this.todoSubscription = supabase
+                .channel('todos-channel')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'todos',
+                        filter: `user_id=eq.${this.userManager.currentUser.id}`
+                    },
+                    (payload) => {
+                        this.handleTodoUpdate(payload.new);
+                    }
+                )
+                .subscribe();
+
+            // Subscribe to mindmap changes
+            this.mindmapSubscription = supabase
+                .channel('mindmaps-channel')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'mindmaps',
+                        filter: `user_id=eq.${this.userManager.currentUser.id}`
+                    },
+                    (payload) => {
+                        this.handleMindmapUpdate(payload.new);
+                    }
+                )
+                .subscribe();
+
+            this.syncStatus = 'online';
+            this.updateSyncStatus('synced');
+            this.startAutoSync();
+            
+            // Save current data to cloud
+            await this.syncAll();
+            
+        } catch (error) {
+            console.error('Sync initialization failed:', error);
+            this.updateSyncStatus('offline');
+        }
     }
 
     handleTodoUpdate(data) {

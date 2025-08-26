@@ -812,6 +812,12 @@
                     this.data.tasks.push(task);
                 }
                 await this.saveData();
+                
+                // Sync to Supabase if logged in
+                if (window.userManager && window.userManager.isLoggedIn()) {
+                    await window.userManager.saveTodos(this.data.tasks);
+                    window.syncManager.updateSyncStatus('synced');
+                }
             }
 
             async deleteTask(id) {
@@ -821,6 +827,12 @@
                 }
                 this.data.tasks = this.data.tasks.filter(t => t.id !== id);
                 await this.saveData();
+                
+                // Sync to Supabase if logged in
+                if (window.userManager && window.userManager.isLoggedIn()) {
+                    await window.userManager.saveTodos(this.data.tasks);
+                    window.syncManager.updateSyncStatus('synced');
+                }
             }
 
             // =============== 이미지 관리 ===============
@@ -1608,15 +1620,40 @@
             // Check authentication and load data on mount
             useEffect(() => {
                 async function init() {
+                    console.log('Checking authentication...');
                     // Check authentication status
                     const { data: { session } } = await supabase.auth.getSession();
                     if (session) {
+                        console.log('User authenticated:', session.user.email);
                         setIsAuthenticated(true);
+                        
+                        // Update sync status to show we're syncing
+                        const indicator = document.getElementById('sync-indicator');
+                        if (indicator) {
+                            indicator.className = 'sync-indicator syncing';
+                            const statusText = indicator.querySelector('.sync-text');
+                            if (statusText) {
+                                statusText.textContent = '동기화 중';
+                            }
+                        }
+                        
                         // Initialize sync manager
                         await syncManager.initializeSync();
+                        console.log('Sync initialized successfully');
                     } else {
+                        console.log('No active session found');
                         // Show auth screen for new users or offer local storage option
                         setIsAuthenticated(false);
+                        
+                        // Update sync status to offline
+                        const indicator = document.getElementById('sync-indicator');
+                        if (indicator) {
+                            indicator.className = 'sync-indicator offline';
+                            const statusText = indicator.querySelector('.sync-text');
+                            if (statusText) {
+                                statusText.textContent = '오프라인';
+                            }
+                        }
                     }
                     setAuthLoading(false);
                     
