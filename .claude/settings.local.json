@@ -3,7 +3,11 @@
     "allow": [
       "WebSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(npx http-server:*)",
+      "Bash(code:*)"
     ],
     "deny": [],
     "ask": []
