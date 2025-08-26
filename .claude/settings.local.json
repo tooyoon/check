@@ -12,7 +12,9 @@
       "Bash(vercel:*)",
       "Bash(git push:*)",
       "Bash(git remote add:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git rev-parse:*)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": [],
