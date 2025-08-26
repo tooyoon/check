@@ -439,10 +439,10 @@
             }
             
             // Check if user is logged in
-            if (!userManager.currentUser) {
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (!user) {
                 showMessage('피드백을 작성하려면 먼저 로그인해주세요.', 'error');
-                // Show login button
-                await userManager.checkAuth();
                 return;
             }
             
@@ -450,12 +450,12 @@
             const content = document.getElementById('content').value;
             
             // Get user info
-            const userName = userManager.currentUser.email?.split('@')[0] || '사용자';
-            const userEmail = userManager.currentUser.email;
+            const userName = user.email?.split('@')[0] || '사용자';
+            const userEmail = user.email;
             
             // Save to Supabase
             const { error } = await supabase
-                .from('feedbacks')
+                .from('feedback')
                 .insert([
                     {
                         category: selectedCategory,
@@ -463,7 +463,7 @@
                         content: content,
                         name: userName,
                         email: userEmail,
-                        user_id: userManager.currentUser.id,
+                        user_id: user.id,
                         votes: 0,
                         status: 'pending'
                     }
@@ -478,7 +478,8 @@
                     category: selectedCategory,
                     title: title,
                     content: content,
-                    email: email,
+                    name: userName,
+                    email: userEmail,
                     created_at: new Date().toISOString(),
                     votes: 0
                 });
@@ -500,7 +501,7 @@
         async function loadFeedbacks() {
             try {
                 const { data, error } = await supabase
-                    .from('feedbacks')
+                    .from('feedback')
                     .select('*')
                     .order('created_at', { ascending: false });
                 
@@ -636,7 +637,7 @@
             try {
                 const feedback = feedbacks.find(f => f.id === feedbackId);
                 await supabase
-                    .from('feedbacks')
+                    .from('feedback')
                     .update({ votes: feedback.votes })
                     .eq('id', feedbackId);
             } catch (error) {
@@ -698,13 +699,14 @@
         // Update auth status display
         async function updateAuthStatus() {
             const authDiv = document.getElementById('authStatus');
-            await userManager.checkAuth();
+            // Check if user is logged in
+            const { data: { user } } = await supabase.auth.getUser();
             
-            if (userManager.currentUser) {
+            if (user) {
                 authDiv.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span>👤 로그인됨: <strong>${userManager.currentUser.email}</strong></span>
-                        <button onclick="userManager.logout(); location.reload();" 
+                        <span>👤 로그인됨: <strong>${user.email}</strong></span>
+                        <button onclick="supabase.auth.signOut(); location.reload();" 
                                 style="padding: 5px 10px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
                             로그아웃
                         </button>
@@ -714,7 +716,7 @@
                 authDiv.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span>⚠️ 피드백을 작성하려면 로그인이 필요합니다</span>
-                        <button onclick="userManager.login(); " 
+                        <button onclick="supabase.auth.signInWithOAuth({ provider: 'google' });" 
                                 style="padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
                             Google 로그인
                         </button>
