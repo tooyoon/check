@@ -57,13 +57,39 @@ class UserManager {
     }
 
     async signOut() {
-        // Save local data before signing out
-        await this.saveLocalDataBackup();
-        
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error('Sign out error:', error);
-            throw error;
+        try {
+            // Check if there's an active session
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session) {
+                console.log('No active session to sign out');
+                // Clear local data anyway
+                this.currentUser = null;
+                this.userProfile = null;
+                this.subscription = null;
+                window.location.reload();
+                return;
+            }
+            
+            // Save local data before signing out
+            await this.saveLocalDataBackup();
+            
+            const { error } = await supabase.auth.signOut();
+            if (error) {
+                console.error('Sign out error:', error);
+                // Clear local state even if signout fails
+                this.currentUser = null;
+                this.userProfile = null;
+                this.subscription = null;
+                window.location.reload();
+            }
+        } catch (err) {
+            console.error('Sign out failed:', err);
+            // Force clear session
+            this.currentUser = null;
+            this.userProfile = null;
+            this.subscription = null;
+            window.location.reload();
         }
     }
 
@@ -392,19 +418,39 @@ class SyncManager {
 
     updateSyncStatus(status) {
         this.syncStatus = status;
+        console.log('Updating sync status to:', status);
         
-        // Update UI indicator
-        const indicator = document.getElementById('sync-indicator');
-        if (indicator) {
-            indicator.className = `sync-indicator ${status}`;
-            const statusText = indicator.querySelector('.sync-text') || indicator.querySelector('span:last-child');
-            if (statusText) {
-                statusText.textContent = status === 'synced' ? '동기화됨' : 
-                                        status === 'syncing' ? '동기화 중' : 
-                                        status === 'online' ? '온라인' : '오프라인';
+        // Update UI indicator - try multiple times to ensure DOM is ready
+        const updateUI = () => {
+            const indicator = document.getElementById('sync-indicator');
+            if (indicator) {
+                // Remove all status classes first
+                indicator.className = 'sync-indicator';
+                // Add new status class
+                if (status === 'synced') {
+                    indicator.classList.add('synced');
+                } else if (status === 'syncing') {
+                    indicator.classList.add('syncing');
+                } else {
+                    indicator.classList.add('offline');
+                }
+                
+                const statusText = indicator.querySelector('.sync-text');
+                if (statusText) {
+                    statusText.textContent = status === 'synced' ? '동기화됨' : 
+                                            status === 'syncing' ? '동기화 중' : 
+                                            status === 'online' ? '온라인' : '오프라인';
+                }
+                indicator.title = `Last sync: ${this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never'}`;
+                console.log('Sync indicator updated successfully');
+            } else {
+                console.log('Sync indicator not found, retrying...');
+                // Retry after a short delay if element not found
+                setTimeout(updateUI, 500);
             }
-            indicator.title = `Last sync: ${this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never'}`;
-        }
+        };
+        
+        updateUI();
     }
 
     cleanup() {
