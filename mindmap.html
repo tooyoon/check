@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindFlow - 스마트 마인드맵</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="mindmap-styles.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', sans-serif;
             box-sizing: border-box;
         }
         
@@ -17,6 +19,31 @@
             padding: 0;
             overflow: hidden;
             background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        /* Glassmorphism effect */
+        .glassmorphism {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Card hover effect */
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            will-change: transform, box-shadow;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        
+        /* Category active state */
+        .category-active {
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
         }
         
         #canvas-container {
@@ -44,22 +71,44 @@
             border-radius: 12px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             cursor: move;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: box-shadow 0.2s, border-color 0.2s;
             z-index: 10;
             user-select: none;
             min-width: 120px;
             text-align: center;
             border: 2px solid transparent;
+            overflow: visible;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
+        /* Hover state - subtle glow */
         .node:hover {
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            border-color: rgba(59, 130, 246, 0.3);
         }
         
+        /* Selected state */
         .node.selected {
             border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            z-index: 15;
+        }
+        
+        /* Multi-selected state */
+        .node.multi-selected {
+            border-color: #8b5cf6;
+            border-width: 3px;
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.4);
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 2px dashed #3b82f6;
+            background: rgba(59, 130, 246, 0.1);
+            pointer-events: none;
+            z-index: 100;
         }
         
         .node.root {
@@ -88,6 +137,24 @@
             width: 100%;
             text-align: center;
             font-size: 14px;
+            white-space: pre-wrap;
+            min-height: 20px;
+            display: block;
+            resize: none;
+            padding: 4px 2px;
+            vertical-align: middle;
+        }
+        
+        .node-text.align-left {
+            text-align: left;
+        }
+        
+        .node-text.align-center {
+            text-align: center;
+        }
+        
+        .node-text.align-right {
+            text-align: right;
         }
         
         .node.root .node-text {
@@ -157,113 +224,444 @@
             display: flex;
         }
         
-        .toolbar {
-            position: fixed;
-            top: 20px;
+        /* Simple resize handle - bottom right corner */
+        .resize-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            cursor: nwse-resize;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 21;
+        }
+        
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            bottom: 2px;
+            right: 2px;
+            width: 10px;
+            height: 10px;
+            background: linear-gradient(135deg, transparent 50%, #3b82f6 50%);
+            border-radius: 0 0 2px 0;
+        }
+        
+        .node:hover .resize-handle {
+            opacity: 0.5;
+        }
+        
+        .resize-handle:hover {
+            opacity: 1 !important;
+        }
+        
+        /* Color Palette */
+        .color-palette {
+            position: absolute;
+            top: -40px;
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            border-radius: 16px;
-            padding: 12px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-            display: flex;
-            gap: 8px;
-            z-index: 100;
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.95);
-        }
-        
-        .toolbar-btn {
-            padding: 8px 16px;
             border-radius: 8px;
-            background: white;
-            border: 1px solid #e5e7eb;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 14px;
-        }
-        
-        .toolbar-btn:hover {
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            color: white;
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-        }
-        
-        .sidebar-nav {
-            position: fixed;
-            left: 20px;
-            top: 20px;
-            background: white;
-            border-radius: 16px;
-            padding: 12px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-            z-index: 100;
-        }
-        
-        .nav-btn {
-            padding: 10px 20px;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            color: white;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-        
-        .nav-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-        }
-        
-        .zoom-controls {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: white;
-            border-radius: 12px;
-            padding: 8px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-            display: flex;
-            flex-direction: column;
+            padding: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
             gap: 4px;
-            z-index: 100;
+            z-index: 30;
         }
         
-        .zoom-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
+        .node:hover .color-palette {
+            display: flex;
+        }
+        
+        /* Text Alignment Controls - at the top */
+        .text-align-controls {
+            position: absolute;
+            top: -120px;
+            left: 50%;
+            transform: translateX(-50%);
             background: white;
+            border-radius: 8px;
+            padding: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
+            gap: 2px;
+            z-index: 30;
+        }
+        
+        .node:hover .text-align-controls {
+            display: flex;
+        }
+        
+        .align-btn {
+            width: 32px;
+            height: 28px;
+            border-radius: 4px;
+            background: #f3f4f6;
             border: 1px solid #e5e7eb;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            font-size: 14px;
+            color: #374151;
             transition: all 0.2s;
         }
         
-        .zoom-btn:hover {
+        .align-btn:hover {
+            background: #e5e7eb;
+            transform: scale(1.05);
+        }
+        
+        .align-btn.active {
+            background: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        /* Font Size Controls - now below text alignment */
+        .font-size-controls {
+            position: absolute;
+            top: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 8px;
+            padding: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: none;
+            gap: 4px;
+            z-index: 30;
+            align-items: center;
+        }
+        
+        .node:hover .font-size-controls {
+            display: flex;
+        }
+        
+        .font-size-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
             background: #f3f4f6;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #374151;
+            transition: all 0.2s;
+        }
+        
+        .font-size-btn:hover {
+            background: #3b82f6;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .font-size-display {
+            padding: 0 8px;
+            font-size: 12px;
+            color: #6b7280;
+            min-width: 30px;
+            text-align: center;
+        }
+        
+        .color-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 2px solid white;
+            transition: transform 0.2s;
+        }
+        
+        .color-btn:hover {
+            transform: scale(1.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        .toolbar {
+            position: fixed;
+            top: 1.25rem;
+            left: calc(20rem + 50%);
+            transform: translateX(-50%);
+            border-radius: 1rem;
+            padding: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            gap: 0.5rem;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .toolbar-btn {
+            padding: 0.625rem 1rem;
+            border-radius: 0.75rem;
+            background: white;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #475569;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .toolbar-btn:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+            border-color: transparent;
+        }
+        
+        .toolbar-btn span:first-child {
+            font-size: 1.125rem;
+        }
+        
+        .sidebar-nav {
+            width: 20rem;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+            border-right: 1px solid rgba(226, 232, 240, 0.8);
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+        }
+        
+        /* Main content adjustment */
+        #canvas-container {
+            margin-left: 20rem;
+        }
+        
+        /* Progress glow effect */
+        .progress-glow {
+            box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+        }
+        
+        /* Fade in animation */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .nav-btn {
+            padding: 0.75rem 1rem;
+            border-radius: 0.75rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .nav-btn span:first-child {
+            font-size: 1.125rem;
+        }
+        
+        .boards-section {
+            border-top: 1px solid rgba(226, 232, 240, 0.5);
+            padding-top: 0.75rem;
+            margin-top: 0.75rem;
+        }
+        
+        .boards-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding: 0 0.25rem;
+        }
+        
+        .boards-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .add-board-btn {
+            width: 1.75rem;
+            height: 1.75rem;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+        
+        .add-board-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .boards-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+            max-height: 20rem;
+            overflow-y: auto;
+        }
+        
+        .board-item {
+            padding: 0.625rem 0.75rem;
+            border-radius: 0.625rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #475569;
+            border: 1px solid transparent;
+        }
+        
+        .board-item:hover {
+            background: #f8fafc;
+            transform: translateX(2px);
+        }
+        
+        .board-item.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.3);
+        }
+        
+        .board-item-icon {
+            margin-right: 0.5rem;
+            opacity: 0.7;
+        }
+        
+        .board-delete {
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            cursor: pointer;
+            padding: 0.125rem;
+            font-size: 1rem;
+        }
+        
+        .board-item:hover .board-delete {
+            opacity: 0.7;
+        }
+        
+        .board-item.active .board-delete {
+            opacity: 0.9;
+        }
+        
+        .board-delete:hover {
+            opacity: 1 !important;
+            transform: scale(1.1);
+        }
+        
+        /* Bottom right controls container */
+        .bottom-controls {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-end;
+            z-index: 100;
         }
         
         .minimap {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            width: 200px;
-            height: 150px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
-            z-index: 100;
+            width: 12rem;
+            height: 9rem;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
             overflow: hidden;
-            border: 2px solid #e5e7eb;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            position: relative;
+        }
+        
+        .minimap-label {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            font-size: 0.625rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 0.125rem 0.375rem;
+            border-radius: 0.25rem;
+        }
+        
+        .zoom-controls {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .zoom-btn {
+            min-width: 2.25rem;
+            height: 2.25rem;
+            padding: 0 0.5rem;
+            border-radius: 0.5rem;
+            background: white;
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #475569;
+        }
+        
+        .zoom-btn:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+            border-color: transparent;
         }
         
         #minimap-canvas {
@@ -273,58 +671,141 @@
     </style>
 </head>
 <body>
-    <!-- Navigation to TodoMaster -->
-    <div class="sidebar-nav">
-        <a href="todomaster_complete.html" class="nav-btn">
-            <span>📋</span>
-            <span>Todo List</span>
-        </a>
-    </div>
+    <!-- Sidebar -->
+    <aside class="sidebar-nav">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                    <span class="text-white text-lg font-bold">🧠</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">MindFlow</h1>
+                    <p class="text-xs text-gray-500">스마트 마인드맵</p>
+                </div>
+            </div>
+            
+            <!-- Stats Card -->
+            <div class="glassmorphism rounded-2xl p-4 mb-4 fade-in">
+                <div class="text-sm text-gray-600 mb-2">전체 통계</div>
+                <div class="text-2xl font-bold text-gray-800 mb-2" id="stats-display">
+                    <span id="total-nodes">0</span>개 노드
+                </div>
+                <div class="text-xs text-gray-500 mb-2">
+                    <span id="total-boards">0</span>개 보드 보유
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-2">
+                    <div id="progress-bar"
+                        class="bg-gradient-to-r from-purple-500 to-pink-600 h-3 rounded-full transition-all duration-500 progress-glow"
+                        style="width: 0%">
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500">
+                    <span id="connections-count">0</span>개 연결
+                </div>
+            </div>
+        </div>
+        
+        <!-- Boards Section -->
+        <div class="mb-6">
+            <div class="font-semibold mb-3 text-gray-700">📂 마인드맵 보드</div>
+            <div class="space-y-2" id="boards-list">
+                <!-- Board items will be added here -->
+            </div>
+            
+            <!-- Add New Board -->
+            <div class="mt-6 bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50">
+                <div class="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <span>➕</span>
+                    새 보드 추가
+                </div>
+                <div class="space-y-3">
+                    <input
+                        id="new-board-name"
+                        placeholder="보드 이름을 입력하세요..."
+                        onkeydown="if(event.key === 'Enter') mindMap.createNewBoard(this.value); this.value = '';"
+                        class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
+                    />
+                    <button
+                        onclick="const input = document.getElementById('new-board-name'); if(input.value.trim()) { mindMap.createNewBoard(input.value); input.value = ''; }"
+                        class="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:from-purple-600 hover:to-pink-700 transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-2"
+                    >
+                        <span>✨</span>
+                        추가하기
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bottom Links -->
+        <div class="space-y-2">
+            <a href="index.html" 
+               class="w-full px-4 py-3 text-left rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 flex items-center gap-2 transform hover:scale-[1.02] transition-all duration-200 shadow-md">
+                📋 TodoMaster
+            </a>
+            <button onclick="mindMap.openSettings()"
+                    class="w-full px-4 py-2 text-left rounded-xl hover:bg-gray-100 flex items-center gap-2">
+                ⚙️ 설정
+            </button>
+        </div>
+    </aside>
     
     <!-- Toolbar -->
     <div class="toolbar">
-        <button class="toolbar-btn" onclick="mindMap.addNode()">
+        <button class="toolbar-btn" onclick="mindMap.addNode()" title="새 노드 추가">
             <span>➕</span>
-            <span>노드 추가</span>
+            <span>추가</span>
         </button>
-        <button class="toolbar-btn" onclick="mindMap.centerView()">
+        <button class="toolbar-btn" onclick="mindMap.centerView()" title="화면 중앙으로">
             <span>🎯</span>
-            <span>중앙 정렬</span>
+            <span>중앙</span>
         </button>
-        <button class="toolbar-btn" onclick="mindMap.saveToLocal()">
+        <button class="toolbar-btn" onclick="mindMap.autoLayout()" title="자동으로 예쁘게 정렬">
+            <span>✨</span>
+            <span>정렬</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.saveToLocal()" title="현재 상태 저장">
             <span>💾</span>
             <span>저장</span>
         </button>
-        <button class="toolbar-btn" onclick="mindMap.exportData()">
+        <button class="toolbar-btn" onclick="mindMap.exportData()" title="파일로 내보내기">
             <span>📤</span>
             <span>내보내기</span>
         </button>
-        <button class="toolbar-btn" onclick="mindMap.importData()">
+        <button class="toolbar-btn" onclick="mindMap.importData()" title="파일 불러오기">
             <span>📥</span>
-            <span>가져오기</span>
+            <span>불러오기</span>
         </button>
-        <button class="toolbar-btn" onclick="mindMap.clearAll()">
+        <button class="toolbar-btn" onclick="mindMap.clearAll()" title="모두 지우기">
             <span>🗑️</span>
             <span>초기화</span>
         </button>
-    </div>
-    
-    <!-- Zoom Controls -->
-    <div class="zoom-controls">
-        <button class="zoom-btn" onclick="mindMap.zoomIn()">
-            <span>➕</span>
-        </button>
-        <button class="zoom-btn" onclick="mindMap.resetZoom()">
-            <span>⟲</span>
-        </button>
-        <button class="zoom-btn" onclick="mindMap.zoomOut()">
-            <span>➖</span>
+        <button class="toolbar-btn" onclick="mindMap.showHelp()" title="단축키 및 사용법">
+            <span>❓</span>
+            <span>도움</span>
         </button>
     </div>
     
-    <!-- Minimap -->
-    <div class="minimap">
-        <canvas id="minimap-canvas"></canvas>
+    <!-- Bottom Right Controls Container -->
+    <div class="bottom-controls">
+        <!-- Minimap (on the left) -->
+        <div class="minimap">
+            <span class="minimap-label">미리보기</span>
+            <canvas id="minimap-canvas"></canvas>
+        </div>
+        
+        <!-- Zoom Controls (on the right) -->
+        <div class="zoom-controls">
+            <button class="zoom-btn" onclick="mindMap.zoomIn()" title="확대 (+)">
+                <span>+</span>
+            </button>
+            <button class="zoom-btn" onclick="mindMap.resetZoom()" title="기본 크기">
+                <span>100%</span>
+            </button>
+            <button class="zoom-btn" onclick="mindMap.zoomOut()" title="축소 (−)">
+                <span>−</span>
+            </button>
+        </div>
     </div>
     
     <!-- Main Canvas Container -->
@@ -349,7 +830,9 @@
                 this.nodes = new Map();
                 this.connections = new Map();
                 this.selectedNode = null;
+                this.selectedNodes = new Set();
                 this.draggedNode = null;
+                this.draggedNodes = [];
                 this.connectionStart = null;
                 this.isDraggingConnection = false;
                 this.panStart = null;
@@ -363,26 +846,48 @@
                 this.minimapCanvas = document.getElementById('minimap-canvas');
                 this.minimapCtx = this.minimapCanvas.getContext('2d');
                 
+                // Undo/Redo history
+                this.history = [];
+                this.historyIndex = -1;
+                this.maxHistory = 50;
+                
+                // Copy/Paste
+                this.copiedNode = null;
+                
+                // Resize
+                this.resizingNode = null;
+                this.resizeStart = null;
+                
+                // Multi-select
+                this.isSelecting = false;
+                this.selectionStart = null;
+                this.selectionBox = null;
+                
+                // Board management
+                this.boards = new Map();
+                this.currentBoardId = null;
+                this.boardIdCounter = 0;
+                
                 this.init();
             }
             
             init() {
-                // Load saved data
-                this.loadFromLocal();
-                
-                // If no saved data, create root node
-                if (this.nodes.size === 0) {
-                    this.createRootNode();
-                }
+                // Load boards
+                this.loadBoards();
                 
                 // Setup event listeners
                 this.setupEventListeners();
                 
-                // Center view
-                setTimeout(() => this.centerView(), 100);
+                // Initialize with first board or create default
+                if (this.boards.size === 0) {
+                    this.createNewBoard('메인 마인드맵');
+                } else {
+                    const firstBoard = Array.from(this.boards.keys())[0];
+                    this.switchBoard(firstBoard);
+                }
                 
-                // Update minimap
-                this.updateMinimap();
+                // Update UI
+                this.updateBoardsList();
             }
             
             createRootNode() {
@@ -392,22 +897,33 @@
                     x: 2500,
                     y: 2500,
                     level: 0,
-                    color: null
+                    color: null,
+                    fontSize: 18
                 };
                 this.nodes.set(rootNode.id, rootNode);
                 this.renderNode(rootNode);
+                this.saveState();
             }
             
             setupEventListeners() {
-                // Canvas panning
+                // Canvas panning and selection
                 this.canvas.addEventListener('mousedown', (e) => {
                     if (e.target === this.canvas && !this.isDraggingConnection) {
-                        this.panStart = { x: e.clientX, y: e.clientY };
-                        this.canvas.classList.add('panning');
+                        // Check if shift is held for multi-select
+                        if (e.shiftKey) {
+                            this.startSelection(e);
+                        } else {
+                            this.panStart = { x: e.clientX, y: e.clientY };
+                            this.canvas.classList.add('panning');
+                        }
                     }
                 });
                 
                 document.addEventListener('mousemove', (e) => {
+                    if (this.isSelecting) {
+                        this.updateSelection(e);
+                    }
+                    
                     if (this.panStart && !this.isDraggingConnection) {
                         const dx = e.clientX - this.panStart.x;
                         const dy = e.clientY - this.panStart.y;
@@ -423,6 +939,10 @@
                 });
                 
                 document.addEventListener('mouseup', (e) => {
+                    if (this.isSelecting) {
+                        this.endSelection();
+                    }
+                    
                     this.panStart = null;
                     this.canvas.classList.remove('panning');
                     
@@ -439,16 +959,56 @@
                 
                 // Keyboard shortcuts
                 document.addEventListener('keydown', (e) => {
-                    if (e.key === 'Delete' && this.selectedNode) {
-                        this.deleteNode(this.selectedNode);
-                    }
-                    if (e.key === 'Tab' && this.selectedNode) {
-                        e.preventDefault();
-                        this.addChildNode(this.selectedNode);
-                    }
-                    if (e.key === 'Enter' && this.selectedNode) {
-                        e.preventDefault();
-                        this.addSiblingNode(this.selectedNode);
+                    // Ctrl/Cmd shortcuts
+                    if (e.ctrlKey || e.metaKey) {
+                        switch(e.key.toLowerCase()) {
+                            case 'z':
+                                e.preventDefault();
+                                this.undo();
+                                break;
+                            case 'y':
+                                e.preventDefault();
+                                this.redo();
+                                break;
+                            case 'c':
+                                e.preventDefault();
+                                this.copy();
+                                break;
+                            case 'v':
+                                e.preventDefault();
+                                this.paste();
+                                break;
+                            case 's':
+                                e.preventDefault();
+                                this.saveToLocal();
+                                this.showToast('저장되었습니다');
+                                break;
+                        }
+                    } else {
+                        switch(e.key) {
+                            case 'Delete':
+                                if (this.selectedNode) {
+                                    this.deleteNode(this.selectedNode);
+                                }
+                                break;
+                            case 'Tab':
+                                e.preventDefault();
+                                if (this.selectedNode) {
+                                    this.addSiblingNode(this.selectedNode);
+                                }
+                                break;
+                            case 'Enter':
+                                // Don't create new node if typing in text field
+                                if (e.target.classList && e.target.classList.contains('node-text')) {
+                                    // Allow default behavior for text input
+                                    return;
+                                }
+                                e.preventDefault();
+                                if (this.selectedNode) {
+                                    this.addChildNode(this.selectedNode);
+                                }
+                                break;
+                        }
                     }
                 });
             }
@@ -460,28 +1020,69 @@
                 nodeEl.style.left = nodeData.x + 'px';
                 nodeEl.style.top = nodeData.y + 'px';
                 
-                // Add level class
-                if (nodeData.level === 0) {
-                    nodeEl.classList.add('root');
-                } else if (nodeData.level === 1) {
-                    nodeEl.classList.add('level-1');
-                } else if (nodeData.level === 2) {
-                    nodeEl.classList.add('level-2');
+                // Apply saved dimensions
+                if (nodeData.width) {
+                    nodeEl.style.width = nodeData.width + 'px';
+                }
+                if (nodeData.height) {
+                    nodeEl.style.height = nodeData.height + 'px';
                 }
                 
-                // Node text
-                const textEl = document.createElement('input');
+                // Apply custom color or level class
+                if (nodeData.customColor) {
+                    nodeEl.style.background = nodeData.customColor;
+                    nodeEl.style.color = 'white';
+                } else {
+                    // Add level class
+                    if (nodeData.level === 0) {
+                        nodeEl.classList.add('root');
+                    } else if (nodeData.level === 1) {
+                        nodeEl.classList.add('level-1');
+                    } else if (nodeData.level === 2) {
+                        nodeEl.classList.add('level-2');
+                    }
+                }
+                
+                // Node text (using textarea for multi-line support)
+                const textEl = document.createElement('textarea');
                 textEl.className = 'node-text';
                 textEl.value = nodeData.text;
+                // Apply saved font size or default
+                if (!nodeData.fontSize) {
+                    nodeData.fontSize = nodeData.level === 0 ? 18 : 14;
+                }
+                textEl.style.fontSize = nodeData.fontSize + 'px';
+                
+                // Apply saved text alignment or default to center
+                if (!nodeData.textAlign) {
+                    nodeData.textAlign = 'center';
+                }
+                textEl.classList.add(`align-${nodeData.textAlign}`);
+                
                 textEl.addEventListener('input', (e) => {
                     nodeData.text = e.target.value;
+                    // Auto-resize textarea
+                    textEl.style.height = 'auto';
+                    textEl.style.height = textEl.scrollHeight + 'px';
                     this.saveToLocal();
                 });
                 textEl.addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.selectNode(nodeData.id);
                 });
+                // Prevent Enter key from creating new node when editing text
+                textEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.stopPropagation();
+                    }
+                });
                 nodeEl.appendChild(textEl);
+                
+                // Auto-resize on load
+                setTimeout(() => {
+                    textEl.style.height = 'auto';
+                    textEl.style.height = textEl.scrollHeight + 'px';
+                }, 0);
                 
                 // Connection points
                 ['top', 'right', 'bottom', 'left'].forEach(pos => {
@@ -519,6 +1120,132 @@
                     nodeEl.appendChild(point);
                 });
                 
+                // Text alignment controls (at the very top)
+                const textAlignControls = document.createElement('div');
+                textAlignControls.className = 'text-align-controls';
+                
+                const alignments = [
+                    { value: 'left', icon: '◀', title: '왼쪽 정렬' },
+                    { value: 'center', icon: '■', title: '가운데 정렬' },
+                    { value: 'right', icon: '▶', title: '오른쪽 정렬' }
+                ];
+                
+                alignments.forEach(align => {
+                    const alignBtn = document.createElement('button');
+                    alignBtn.className = 'align-btn';
+                    if (nodeData.textAlign === align.value) {
+                        alignBtn.classList.add('active');
+                    }
+                    alignBtn.textContent = align.icon;
+                    alignBtn.title = align.title;
+                    alignBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        nodeData.textAlign = align.value;
+                        
+                        // Update text element
+                        textEl.classList.remove('align-left', 'align-center', 'align-right');
+                        textEl.classList.add(`align-${align.value}`);
+                        
+                        // Update button states
+                        textAlignControls.querySelectorAll('.align-btn').forEach(btn => {
+                            btn.classList.remove('active');
+                        });
+                        alignBtn.classList.add('active');
+                        
+                        this.saveState();
+                        this.saveToLocal();
+                    });
+                    textAlignControls.appendChild(alignBtn);
+                });
+                
+                nodeEl.appendChild(textAlignControls);
+                
+                // Font size controls (below text alignment)
+                const fontSizeControls = document.createElement('div');
+                fontSizeControls.className = 'font-size-controls';
+                
+                const decreaseBtn = document.createElement('button');
+                decreaseBtn.className = 'font-size-btn';
+                decreaseBtn.textContent = '−';
+                
+                const fontSizeDisplay = document.createElement('span');
+                fontSizeDisplay.className = 'font-size-display';
+                fontSizeDisplay.textContent = nodeData.fontSize + 'px';
+                
+                const increaseBtn = document.createElement('button');
+                increaseBtn.className = 'font-size-btn';
+                increaseBtn.textContent = '+';
+                
+                decreaseBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (nodeData.fontSize > 10) {
+                        nodeData.fontSize -= 2;
+                        textEl.style.fontSize = nodeData.fontSize + 'px';
+                        fontSizeDisplay.textContent = nodeData.fontSize + 'px';
+                        textEl.style.height = 'auto';
+                        textEl.style.height = textEl.scrollHeight + 'px';
+                        this.saveState();
+                        this.saveToLocal();
+                    }
+                });
+                
+                increaseBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (nodeData.fontSize < 32) {
+                        nodeData.fontSize += 2;
+                        textEl.style.fontSize = nodeData.fontSize + 'px';
+                        fontSizeDisplay.textContent = nodeData.fontSize + 'px';
+                        textEl.style.height = 'auto';
+                        textEl.style.height = textEl.scrollHeight + 'px';
+                        this.saveState();
+                        this.saveToLocal();
+                    }
+                });
+                
+                fontSizeControls.appendChild(decreaseBtn);
+                fontSizeControls.appendChild(fontSizeDisplay);
+                fontSizeControls.appendChild(increaseBtn);
+                nodeEl.appendChild(fontSizeControls);
+                
+                // Color palette
+                const colorPalette = document.createElement('div');
+                colorPalette.className = 'color-palette';
+                
+                const colors = [
+                    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                    'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+                    '#ffffff',
+                    '#f3f4f6'
+                ];
+                
+                colors.forEach(color => {
+                    const colorBtn = document.createElement('div');
+                    colorBtn.className = 'color-btn';
+                    colorBtn.style.background = color;
+                    if (color === '#ffffff' || color === '#f3f4f6') {
+                        colorBtn.style.border = '1px solid #d1d5db';
+                    }
+                    colorBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        nodeData.customColor = color;
+                        nodeEl.style.background = color;
+                        if (color === '#ffffff' || color === '#f3f4f6') {
+                            nodeEl.style.color = '#374151';
+                        } else {
+                            nodeEl.style.color = 'white';
+                        }
+                        this.saveState();
+                        this.saveToLocal();
+                    });
+                    colorPalette.appendChild(colorBtn);
+                });
+                
+                nodeEl.appendChild(colorPalette);
+                
                 // Delete button
                 if (nodeData.level !== 0) {
                     const deleteBtn = document.createElement('div');
@@ -531,21 +1258,98 @@
                     nodeEl.appendChild(deleteBtn);
                 }
                 
+                // Simple resize handle
+                const resizeHandle = document.createElement('div');
+                resizeHandle.className = 'resize-handle';
+                resizeHandle.addEventListener('mousedown', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    this.resizingNode = nodeData;
+                    this.resizeStart = {
+                        x: e.clientX,
+                        y: e.clientY,
+                        width: nodeEl.offsetWidth,
+                        height: nodeEl.offsetHeight
+                    };
+                });
+                nodeEl.appendChild(resizeHandle);
+                
                 // Drag functionality
                 nodeEl.addEventListener('mousedown', (e) => {
-                    if (e.target.classList.contains('connection-point') || e.target.classList.contains('delete-btn')) return;
+                    if (e.target.classList.contains('connection-point') || 
+                        e.target.classList.contains('delete-btn') ||
+                        e.target.classList.contains('resize-handle') ||
+                        e.target.classList.contains('color-btn') ||
+                        e.target.classList.contains('font-size-btn')) return;
+                    
                     if (!this.isDraggingConnection) {
-                        this.draggedNode = nodeData;
-                        this.dragOffset = {
-                            x: e.clientX - nodeData.x - this.viewOffset.x,
-                            y: e.clientY - nodeData.y - this.viewOffset.y
-                        };
-                        this.selectNode(nodeData.id);
+                        // Check if clicking on already selected node with multiple selection
+                        if (this.selectedNodes.has(nodeData.id) && this.selectedNodes.size > 1) {
+                            // Start dragging all selected nodes
+                            this.draggedNodes = Array.from(this.selectedNodes).map(id => {
+                                const node = this.nodes.get(id);
+                                return {
+                                    node: node,
+                                    offset: {
+                                        x: e.clientX - node.x - this.viewOffset.x,
+                                        y: e.clientY - node.y - this.viewOffset.y
+                                    }
+                                };
+                            });
+                        } else {
+                            // Single node drag
+                            if (e.ctrlKey || e.metaKey) {
+                                // Add to selection
+                                this.toggleNodeSelection(nodeData.id);
+                            } else {
+                                // Clear selection and select only this node
+                                this.clearSelection();
+                                this.selectNode(nodeData.id);
+                            }
+                            
+                            this.draggedNode = nodeData;
+                            this.dragOffset = {
+                                x: e.clientX - nodeData.x - this.viewOffset.x,
+                                y: e.clientY - nodeData.y - this.viewOffset.y
+                            };
+                        }
                     }
                 });
                 
                 document.addEventListener('mousemove', (e) => {
-                    if (this.draggedNode && !this.isDraggingConnection) {
+                    if (this.resizingNode) {
+                        const nodeEl = document.getElementById(this.resizingNode.id);
+                        if (nodeEl) {
+                            const dx = e.clientX - this.resizeStart.x;
+                            const dy = e.clientY - this.resizeStart.y;
+                            const newWidth = Math.max(100, this.resizeStart.width + dx);
+                            const newHeight = Math.max(40, this.resizeStart.height + dy);
+                            
+                            nodeEl.style.width = newWidth + 'px';
+                            nodeEl.style.height = newHeight + 'px';
+                            
+                            this.resizingNode.width = newWidth;
+                            this.resizingNode.height = newHeight;
+                            
+                            this.updateConnections();
+                        }
+                    }
+                    
+                    // Multi-node drag
+                    if (this.draggedNodes.length > 0 && !this.isDraggingConnection) {
+                        this.draggedNodes.forEach(item => {
+                            item.node.x = e.clientX - item.offset.x - this.viewOffset.x;
+                            item.node.y = e.clientY - item.offset.y - this.viewOffset.y;
+                            const nodeEl = document.getElementById(item.node.id);
+                            if (nodeEl) {
+                                nodeEl.style.left = item.node.x + 'px';
+                                nodeEl.style.top = item.node.y + 'px';
+                            }
+                        });
+                        this.updateConnections();
+                    }
+                    // Single node drag
+                    else if (this.draggedNode && !this.isDraggingConnection) {
                         this.draggedNode.x = e.clientX - this.dragOffset.x - this.viewOffset.x;
                         this.draggedNode.y = e.clientY - this.dragOffset.y - this.viewOffset.y;
                         const nodeEl = document.getElementById(this.draggedNode.id);
@@ -558,8 +1362,25 @@
                 });
                 
                 document.addEventListener('mouseup', () => {
+                    // Clean up resize state
+                    if (this.resizingNode) {
+                        this.resizingNode = null;
+                        this.resizeStart = null;
+                        this.saveState();
+                        this.saveToLocal();
+                    }
+                    
+                    // Clean up drag state
+                    if (this.draggedNodes.length > 0) {
+                        this.draggedNodes = [];
+                        this.saveState();
+                        this.saveToLocal();
+                        this.updateMinimap();
+                    }
+                    
                     if (this.draggedNode && !this.isDraggingConnection) {
                         this.draggedNode = null;
+                        this.saveState();
                         this.saveToLocal();
                         this.updateMinimap();
                     }
@@ -576,10 +1397,12 @@
                 const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 tempPath.id = 'temp-connection';
                 tempPath.setAttribute('fill', 'none');
-                tempPath.setAttribute('stroke', '#3b82f6');
-                tempPath.setAttribute('stroke-width', '3');
-                tempPath.setAttribute('stroke-dasharray', '5,5');
+                tempPath.setAttribute('stroke', '#8b5cf6');
+                tempPath.setAttribute('stroke-width', '2');
+                tempPath.setAttribute('stroke-dasharray', '8,4');
+                tempPath.setAttribute('stroke-linecap', 'round');
                 tempPath.style.pointerEvents = 'none';
+                tempPath.style.opacity = '0.7';
                 this.connectionsGroup.appendChild(tempPath);
                 
                 // Initial update
@@ -638,8 +1461,10 @@
                 });
                 
                 this.renderConnection(connectionId);
+                this.saveState();
                 this.saveToLocal();
                 this.updateMinimap();
+                this.updateStats();
             }
             
             renderConnection(connectionId) {
@@ -759,16 +1584,15 @@
             }
             
             selectNode(nodeId) {
-                // Remove previous selection
-                document.querySelectorAll('.node.selected').forEach(node => {
-                    node.classList.remove('selected');
-                });
+                // Clear multi-selection
+                this.clearSelection();
                 
                 // Add selection to current node
                 const nodeEl = document.getElementById(nodeId);
                 if (nodeEl) {
                     nodeEl.classList.add('selected');
                     this.selectedNode = nodeId;
+                    this.selectedNodes.add(nodeId);
                 }
             }
             
@@ -797,6 +1621,7 @@
                 this.selectedNode = null;
                 this.saveToLocal();
                 this.updateMinimap();
+                this.updateStats();
             }
             
             addNode(parentId = null) {
@@ -806,7 +1631,8 @@
                     x: 2500 + Math.random() * 200 - 100,
                     y: 2500 + Math.random() * 200 - 100,
                     level: parentId ? (this.nodes.get(parentId)?.level || 0) + 1 : 1,
-                    color: null
+                    color: null,
+                    fontSize: 14
                 };
                 
                 this.nodes.set(newNode.id, newNode);
@@ -825,6 +1651,7 @@
                 this.selectNode(newNode.id);
                 this.saveToLocal();
                 this.updateMinimap();
+                this.updateStats();
                 
                 // Focus on text input
                 setTimeout(() => {
@@ -852,7 +1679,8 @@
                     x: parent.x + Math.cos(angle) * distance,
                     y: parent.y + Math.sin(angle) * distance,
                     level: parent.level + 1,
-                    color: null
+                    color: null,
+                    fontSize: 14
                 };
                 
                 this.nodes.set(newNode.id, newNode);
@@ -869,6 +1697,7 @@
                 this.selectNode(newNode.id);
                 this.saveToLocal();
                 this.updateMinimap();
+                this.updateStats();
                 
                 // Focus on text input
                 setTimeout(() => {
@@ -904,7 +1733,8 @@
                         x: node.x + 150,
                         y: node.y,
                         level: node.level,
-                        color: null
+                        color: null,
+                        fontSize: 14
                     };
                     
                     this.nodes.set(newNode.id, newNode);
@@ -937,9 +1767,128 @@
                 this.updateView();
             }
             
+            // Auto-layout feature - arrange nodes beautifully
+            autoLayout() {
+                if (this.nodes.size === 0) return;
+                
+                this.saveState(); // For undo
+                
+                // Build tree structure
+                const root = Array.from(this.nodes.values()).find(n => n.level === 0);
+                if (!root) return;
+                
+                // Create adjacency list
+                const children = new Map();
+                const parents = new Map();
+                this.nodes.forEach(node => {
+                    children.set(node.id, []);
+                });
+                
+                this.connections.forEach(conn => {
+                    const childList = children.get(conn.from) || [];
+                    childList.push(conn.to);
+                    children.set(conn.from, childList);
+                    parents.set(conn.to, conn.from);
+                });
+                
+                // Layout parameters
+                const HORIZONTAL_SPACING = 250;
+                const VERTICAL_SPACING = 120;
+                const SIBLING_SPACING = 100;
+                
+                // Calculate subtree width
+                const getSubtreeWidth = (nodeId) => {
+                    const nodeChildren = children.get(nodeId) || [];
+                    if (nodeChildren.length === 0) return 150; // Node width
+                    
+                    let totalWidth = 0;
+                    nodeChildren.forEach(childId => {
+                        totalWidth += getSubtreeWidth(childId);
+                    });
+                    
+                    // Add spacing between children
+                    totalWidth += (nodeChildren.length - 1) * SIBLING_SPACING;
+                    
+                    return Math.max(150, totalWidth);
+                };
+                
+                // Radial layout for first level, hierarchical for rest
+                const layoutNode = (nodeId, x, y, level = 0) => {
+                    const node = this.nodes.get(nodeId);
+                    if (!node) return;
+                    
+                    // Update node position with animation
+                    node.x = x;
+                    node.y = y;
+                    
+                    const nodeEl = document.getElementById(nodeId);
+                    if (nodeEl) {
+                        nodeEl.style.transition = 'left 0.6s cubic-bezier(0.4, 0, 0.2, 1), top 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                        nodeEl.style.left = x + 'px';
+                        nodeEl.style.top = y + 'px';
+                        
+                        setTimeout(() => {
+                            nodeEl.style.transition = '';
+                        }, 600);
+                    }
+                    
+                    const nodeChildren = children.get(nodeId) || [];
+                    if (nodeChildren.length === 0) return;
+                    
+                    if (level === 0) {
+                        // Root node - arrange children in a semi-circle
+                        const angleRange = Math.PI; // 180 degrees
+                        const startAngle = -angleRange / 2;
+                        const angleStep = nodeChildren.length > 1 ? angleRange / (nodeChildren.length - 1) : 0;
+                        const radius = Math.max(200, nodeChildren.length * 40);
+                        
+                        nodeChildren.forEach((childId, index) => {
+                            const angle = startAngle + index * angleStep;
+                            const childX = x + Math.cos(angle) * radius;
+                            const childY = y + Math.sin(angle) * radius;
+                            layoutNode(childId, childX, childY, level + 1);
+                        });
+                    } else {
+                        // Non-root nodes - hierarchical layout
+                        const subtreeWidth = getSubtreeWidth(nodeId);
+                        let currentX = x - subtreeWidth / 2;
+                        
+                        nodeChildren.forEach((childId, index) => {
+                            const childWidth = getSubtreeWidth(childId);
+                            const childX = currentX + childWidth / 2;
+                            const childY = y + VERTICAL_SPACING;
+                            
+                            layoutNode(childId, childX, childY, level + 1);
+                            
+                            currentX += childWidth + SIBLING_SPACING;
+                        });
+                    }
+                };
+                
+                // Start layout from root at center
+                const centerX = 2500;
+                const centerY = 2300;
+                layoutNode(root.id, centerX, centerY, 0);
+                
+                // Update connections after animation
+                setTimeout(() => {
+                    this.updateConnections();
+                    this.saveToLocal();
+                    this.updateMinimap();
+                    this.updateStats();
+                    this.centerView();
+                }, 650);
+                
+                this.showToast('✨ 자동 정렬 완료!');
+            }
+            
             updateView() {
-                this.canvas.style.transform = `translate(${this.viewOffset.x}px, ${this.viewOffset.y}px) scale(${this.zoom})`;
-                this.nodesContainer.style.transform = `translate(${this.viewOffset.x}px, ${this.viewOffset.y}px) scale(${this.zoom})`;
+                const transform = `translate(${this.viewOffset.x}px, ${this.viewOffset.y}px) scale(${this.zoom})`;
+                this.canvas.style.transform = transform;
+                this.nodesContainer.style.transform = transform;
+                // Make sure both are synchronized
+                this.canvas.style.transformOrigin = '0 0';
+                this.nodesContainer.style.transformOrigin = '0 0';
             }
             
             zoomIn() {
@@ -991,41 +1940,53 @@
             }
             
             saveToLocal() {
-                const data = {
-                    nodes: Array.from(this.nodes.values()),
-                    connections: Array.from(this.connections.entries()).map(([id, conn]) => ({
-                        id,
-                        ...conn
-                    })),
-                    nodeIdCounter: this.nodeIdCounter
-                };
-                localStorage.setItem('mindMapData', JSON.stringify(data));
+                this.saveBoards();
             }
             
             loadFromLocal() {
-                const savedData = localStorage.getItem('mindMapData');
-                if (savedData) {
+                // This method is now handled by loadBoards and switchBoard
+                // Keeping for backward compatibility - migrate old data if exists
+                const oldData = localStorage.getItem('mindMapData');
+                if (oldData && this.boards.size === 0) {
                     try {
-                        const data = JSON.parse(savedData);
+                        const data = JSON.parse(oldData);
                         
-                        // Load nodes
+                        // Create a default board with old data
+                        const boardId = 'board_0';
+                        const nodesMap = new Map();
+                        const connectionsMap = new Map();
+                        
                         data.nodes.forEach(node => {
-                            this.nodes.set(node.id, node);
-                            this.renderNode(node);
+                            nodesMap.set(node.id, node);
                         });
                         
-                        // Load connections
                         data.connections.forEach(conn => {
-                            this.connections.set(conn.id, {
+                            connectionsMap.set(conn.id, {
                                 from: conn.from,
-                                to: conn.to
+                                to: conn.to,
+                                fromPos: conn.fromPos,
+                                toPos: conn.toPos
                             });
-                            this.renderConnection(conn.id);
                         });
                         
-                        this.nodeIdCounter = data.nodeIdCounter || 0;
+                        this.boards.set(boardId, {
+                            id: boardId,
+                            name: '기존 마인드맵',
+                            nodes: nodesMap,
+                            connections: connectionsMap,
+                            nodeIdCounter: data.nodeIdCounter || 0,
+                            createdAt: new Date().toISOString()
+                        });
+                        
+                        this.boardIdCounter = 1;
+                        
+                        // Remove old data format
+                        localStorage.removeItem('mindMapData');
+                        
+                        // Save in new format
+                        this.saveBoards();
                     } catch (e) {
-                        console.error('Failed to load saved data:', e);
+                        console.error('Failed to migrate old data:', e);
                     }
                 }
             }
@@ -1111,7 +2072,645 @@
                 this.updateMinimap();
                 this.centerView();
             }
+            // Undo/Redo functionality
+            saveState() {
+                const state = {
+                    nodes: Array.from(this.nodes.values()),
+                    connections: Array.from(this.connections.entries()).map(([id, conn]) => ({
+                        id,
+                        ...conn
+                    })),
+                    nodeIdCounter: this.nodeIdCounter
+                };
+                
+                this.history = this.history.slice(0, this.historyIndex + 1);
+                this.history.push(JSON.stringify(state));
+                
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                } else {
+                    this.historyIndex++;
+                }
+            }
+            
+            undo() {
+                if (this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.loadState(this.history[this.historyIndex]);
+                    this.showToast('실행 취소');
+                }
+            }
+            
+            redo() {
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.loadState(this.history[this.historyIndex]);
+                    this.showToast('다시 실행');
+                }
+            }
+            
+            loadState(stateStr) {
+                const state = JSON.parse(stateStr);
+                
+                this.nodesContainer.innerHTML = '';
+                this.connectionsGroup.innerHTML = '';
+                this.nodes.clear();
+                this.connections.clear();
+                
+                state.nodes.forEach(node => {
+                    this.nodes.set(node.id, node);
+                    this.renderNode(node);
+                });
+                
+                state.connections.forEach(conn => {
+                    this.connections.set(conn.id, {
+                        from: conn.from,
+                        to: conn.to,
+                        fromPos: conn.fromPos || 'right',
+                        toPos: conn.toPos || 'left'
+                    });
+                    this.renderConnection(conn.id);
+                });
+                
+                this.nodeIdCounter = state.nodeIdCounter;
+            }
+            
+            // Copy/Paste
+            copy() {
+                if (this.selectedNode) {
+                    const node = this.nodes.get(this.selectedNode);
+                    if (node) {
+                        this.copiedNode = JSON.parse(JSON.stringify(node));
+                        this.showToast('복사됨');
+                    }
+                }
+            }
+            
+            paste() {
+                if (this.copiedNode) {
+                    const newNode = {
+                        ...this.copiedNode,
+                        id: 'node_' + this.nodeIdCounter++,
+                        x: this.copiedNode.x + 50,
+                        y: this.copiedNode.y + 50
+                    };
+                    
+                    this.nodes.set(newNode.id, newNode);
+                    this.renderNode(newNode);
+                    this.selectNode(newNode.id);
+                    this.saveState();
+                    this.saveToLocal();
+                    this.showToast('붙여넣기 완료');
+                }
+            }
+            
+            // Multi-select functions
+            startSelection(e) {
+                this.isSelecting = true;
+                this.selectionStart = {
+                    x: e.clientX,
+                    y: e.clientY
+                };
+                
+                // Create selection box
+                this.selectionBox = document.createElement('div');
+                this.selectionBox.className = 'selection-box';
+                this.container.appendChild(this.selectionBox);
+            }
+            
+            updateSelection(e) {
+                if (!this.selectionBox) return;
+                
+                const x1 = Math.min(this.selectionStart.x, e.clientX);
+                const y1 = Math.min(this.selectionStart.y, e.clientY);
+                const x2 = Math.max(this.selectionStart.x, e.clientX);
+                const y2 = Math.max(this.selectionStart.y, e.clientY);
+                
+                this.selectionBox.style.left = x1 + 'px';
+                this.selectionBox.style.top = y1 + 'px';
+                this.selectionBox.style.width = (x2 - x1) + 'px';
+                this.selectionBox.style.height = (y2 - y1) + 'px';
+                
+                // Check which nodes are in selection
+                this.nodes.forEach((node, id) => {
+                    const nodeEl = document.getElementById(id);
+                    if (nodeEl) {
+                        const rect = nodeEl.getBoundingClientRect();
+                        const nodeX = rect.left + rect.width / 2;
+                        const nodeY = rect.top + rect.height / 2;
+                        
+                        if (nodeX >= x1 && nodeX <= x2 && nodeY >= y1 && nodeY <= y2) {
+                            this.addToSelection(id);
+                        } else if (!e.ctrlKey && !e.metaKey) {
+                            this.removeFromSelection(id);
+                        }
+                    }
+                });
+            }
+            
+            endSelection() {
+                this.isSelecting = false;
+                if (this.selectionBox) {
+                    this.selectionBox.remove();
+                    this.selectionBox = null;
+                }
+            }
+            
+            addToSelection(nodeId) {
+                this.selectedNodes.add(nodeId);
+                const nodeEl = document.getElementById(nodeId);
+                if (nodeEl) {
+                    nodeEl.classList.add('multi-selected');
+                }
+            }
+            
+            removeFromSelection(nodeId) {
+                this.selectedNodes.delete(nodeId);
+                const nodeEl = document.getElementById(nodeId);
+                if (nodeEl) {
+                    nodeEl.classList.remove('multi-selected');
+                }
+            }
+            
+            clearSelection() {
+                this.selectedNodes.forEach(id => {
+                    const nodeEl = document.getElementById(id);
+                    if (nodeEl) {
+                        nodeEl.classList.remove('multi-selected');
+                        nodeEl.classList.remove('selected');
+                    }
+                });
+                this.selectedNodes.clear();
+                this.selectedNode = null;
+            }
+            
+            toggleNodeSelection(nodeId) {
+                if (this.selectedNodes.has(nodeId)) {
+                    this.removeFromSelection(nodeId);
+                } else {
+                    this.addToSelection(nodeId);
+                }
+            }
+            
+            // Toast notification
+            showToast(message) {
+                const toast = document.createElement('div');
+                toast.style.cssText = `
+                    position: fixed;
+                    bottom: 30px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    z-index: 1000;
+                    animation: fadeIn 0.3s;
+                `;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.style.animation = 'fadeOut 0.3s';
+                    setTimeout(() => toast.remove(), 300);
+                }, 2000);
+            }
+            
+            // Settings modal
+            openSettings() {
+                // Create settings modal
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+                        <h2 class="text-2xl font-bold mb-4">⚙️ 설정</h2>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    🎨 테마 색상
+                                </label>
+                                <select id="theme-color" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="purple">보라색 (기본)</option>
+                                    <option value="blue">파란색</option>
+                                    <option value="green">초록색</option>
+                                    <option value="red">빨간색</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    📏 기본 노드 크기
+                                </label>
+                                <input type="range" id="default-node-size" min="100" max="200" value="120" 
+                                       class="w-full">
+                                <span id="size-display" class="text-sm text-gray-500">120px</span>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    🔗 연결선 스타일
+                                </label>
+                                <select id="line-style" class="w-full px-4 py-2 border rounded-lg">
+                                    <option value="curved">곡선</option>
+                                    <option value="straight">직선</option>
+                                    <option value="elbow">꺾인선</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" id="auto-save" checked class="rounded">
+                                    <span class="text-sm font-medium text-gray-700">자동 저장</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-2 mt-6">
+                            <button onclick="this.closest('.fixed').remove()" 
+                                    class="flex-1 px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                                취소
+                            </button>
+                            <button onclick="mindMap.saveSettings(); this.closest('.fixed').remove()" 
+                                    class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                                저장
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // Handle click outside
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+                
+                // Update size display
+                const sizeInput = document.getElementById('default-node-size');
+                const sizeDisplay = document.getElementById('size-display');
+                sizeInput.addEventListener('input', () => {
+                    sizeDisplay.textContent = sizeInput.value + 'px';
+                });
+            }
+            
+            saveSettings() {
+                // Save settings to localStorage
+                const settings = {
+                    themeColor: document.getElementById('theme-color').value,
+                    defaultNodeSize: document.getElementById('default-node-size').value,
+                    lineStyle: document.getElementById('line-style').value,
+                    autoSave: document.getElementById('auto-save').checked
+                };
+                
+                localStorage.setItem('mindMapSettings', JSON.stringify(settings));
+                this.showToast('설정이 저장되었습니다');
+            }
+            
+            // Show help modal
+            showHelp() {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                        <h2 class="text-2xl font-bold mb-4">📖 사용 가이드</h2>
+                        
+                        <div class="space-y-4">
+                            <div class="bg-blue-50 p-4 rounded-lg">
+                                <h3 class="font-bold text-blue-900 mb-2">🎯 간편한 상호작용</h3>
+                                <ul class="space-y-1 text-sm text-blue-800">
+                                    <li>• <b>노드 이동</b>: 노드를 드래그하여 자유롭게 이동</li>
+                                    <li>• <b>크기 조절</b>: 우하단 모서리 드래그로 크기 조절</li>
+                                    <li>• <b>연결선 생성</b>: 연결점을 드래그하여 노드 연결</li>
+                                    <li>• <b>빠른 반응</b>: 최적화된 성능으로 부드러운 조작</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-purple-50 p-4 rounded-lg">
+                                <h3 class="font-bold text-purple-900 mb-2">⌨️ 키보드 단축키</h3>
+                                <div class="grid grid-cols-2 gap-2 text-sm text-purple-800">
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Enter</kbd> 자식 노드 추가</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Tab</kbd> 형제 노드 추가</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Delete</kbd> 선택 노드 삭제</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Ctrl+Z</kbd> 실행 취소</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Ctrl+Y</kbd> 다시 실행</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Ctrl+C</kbd> 복사</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Ctrl+V</kbd> 붙여넣기</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Ctrl+S</kbd> 저장</div>
+                                    <div><kbd class="px-2 py-1 bg-white rounded">Shift+드래그</kbd> 다중 선택</div>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <h3 class="font-bold text-green-900 mb-2">🖱️ 마우스 조작</h3>
+                                <ul class="space-y-1 text-sm text-green-800">
+                                    <li>• <b>노드 드래그</b>: 이동 모드에서 노드 이동</li>
+                                    <li>• <b>연결점 드래그</b>: 노드 간 연결선 생성</li>
+                                    <li>• <b>빈 공간 드래그</b>: 캔버스 이동</li>
+                                    <li>• <b>Shift+드래그</b>: 영역 선택으로 다중 선택</li>
+                                    <li>• <b>줌 버튼</b>: 우측 하단 +/- 버튼으로 확대/축소</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <h3 class="font-bold text-yellow-900 mb-2">💡 팁</h3>
+                                <ul class="space-y-1 text-sm text-yellow-800">
+                                    <li>• 노드 위 호버 시 색상 팔레트와 글자 크기 조절 버튼 표시</li>
+                                    <li>• 연결선 클릭으로 삭제 가능</li>
+                                    <li>• Shift+Enter로 노드 내 줄바꿈</li>
+                                    <li>• 여러 노드 선택 후 함께 이동 가능</li>
+                                    <li>• 크기조절 시 최소 크기 제한으로 안정성 보장</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <button onclick="this.closest('.fixed').remove()" 
+                                class="mt-6 w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700">
+                            닫기
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                // Close on outside click
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.remove();
+                    }
+                });
+            }
+            
+            // Board management methods
+            createNewBoard(name = null) {
+                // Get name from input field if not provided
+                if (!name) {
+                    const input = document.getElementById('new-board-name');
+                    name = input ? input.value.trim() : '';
+                    if (input) input.value = '';
+                }
+                
+                const boardName = name || prompt('새 보드 이름을 입력하세요:', '새 마인드맵');
+                if (!boardName || !boardName.trim()) return;
+                
+                const boardId = 'board_' + this.boardIdCounter++;
+                const boardData = {
+                    id: boardId,
+                    name: boardName,
+                    nodes: new Map(),
+                    connections: new Map(),
+                    nodeIdCounter: 0,
+                    createdAt: new Date().toISOString()
+                };
+                
+                this.boards.set(boardId, boardData);
+                this.switchBoard(boardId);
+                this.saveBoards();
+                this.updateBoardsList();
+                this.showToast(`보드 "${boardName}" 생성됨`);
+            }
+            
+            switchBoard(boardId) {
+                // Save current board data if exists
+                if (this.currentBoardId) {
+                    const currentBoard = this.boards.get(this.currentBoardId);
+                    if (currentBoard) {
+                        currentBoard.nodes = new Map(this.nodes);
+                        currentBoard.connections = new Map(this.connections);
+                        currentBoard.nodeIdCounter = this.nodeIdCounter;
+                    }
+                }
+                
+                // Clear current display
+                this.nodesContainer.innerHTML = '';
+                this.connectionsGroup.innerHTML = '';
+                this.nodes.clear();
+                this.connections.clear();
+                this.selectedNode = null;
+                this.selectedNodes.clear();
+                
+                // Load new board
+                const board = this.boards.get(boardId);
+                if (board) {
+                    this.currentBoardId = boardId;
+                    this.nodes = new Map(board.nodes);
+                    this.connections = new Map(board.connections);
+                    this.nodeIdCounter = board.nodeIdCounter;
+                    
+                    // Render all nodes and connections
+                    this.nodes.forEach(node => this.renderNode(node));
+                    this.connections.forEach((conn, id) => this.renderConnection(id));
+                    
+                    // If empty board, create root node
+                    if (this.nodes.size === 0) {
+                        this.createRootNode();
+                    }
+                    
+                    // Update view
+                    setTimeout(() => this.centerView(), 100);
+                    this.updateMinimap();
+                    this.updateBoardsList();
+                }
+            }
+            
+            deleteBoard(boardId) {
+                if (this.boards.size <= 1) {
+                    this.showToast('최소 하나의 보드가 필요합니다');
+                    return;
+                }
+                
+                const board = this.boards.get(boardId);
+                if (confirm(`"${board.name}" 보드를 삭제하시겠습니까?`)) {
+                    this.boards.delete(boardId);
+                    
+                    if (this.currentBoardId === boardId) {
+                        const firstBoard = Array.from(this.boards.keys())[0];
+                        this.switchBoard(firstBoard);
+                    }
+                    
+                    this.saveBoards();
+                    this.updateBoardsList();
+                    this.showToast('보드가 삭제되었습니다');
+                }
+            }
+            
+            updateBoardsList() {
+                const boardsList = document.getElementById('boards-list');
+                boardsList.innerHTML = '';
+                
+                // Update statistics
+                this.updateStats();
+                
+                this.boards.forEach((board, boardId) => {
+                    const boardItem = document.createElement('div');
+                    const isActive = boardId === this.currentBoardId;
+                    
+                    boardItem.className = `flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all duration-300 card-hover ${
+                        isActive ? 'category-active text-white shadow-lg' : 'glassmorphism hover:shadow-md'
+                    }`;
+                    
+                    const nodeCount = board.nodes instanceof Map ? board.nodes.size : (board.nodes ? board.nodes.length : 0);
+                    
+                    boardItem.innerHTML = `
+                        <span class="text-lg w-6 text-center">🧠</span>
+                        <div class="flex-1">
+                            <div class="font-medium">${board.name}</div>
+                            <div class="text-xs ${isActive ? 'text-white/80' : 'text-gray-500'}">
+                                ${nodeCount}개 노드
+                            </div>
+                        </div>
+                        <button 
+                            onclick="event.stopPropagation(); mindMap.deleteBoard('${boardId}')"
+                            class="${isActive ? 'text-white/80 hover:text-white' : 'text-gray-400 hover:text-red-600'}"
+                            title="삭제">
+                            ✕
+                        </button>
+                    `;
+                    
+                    boardItem.addEventListener('click', () => {
+                        this.switchBoard(boardId);
+                    });
+                    
+                    boardsList.appendChild(boardItem);
+                });
+            }
+            
+            updateStats() {
+                // Calculate statistics
+                let totalNodes = 0;
+                let totalConnections = 0;
+                
+                this.boards.forEach(board => {
+                    if (board.nodes instanceof Map) {
+                        totalNodes += board.nodes.size;
+                    } else if (board.nodes) {
+                        totalNodes += board.nodes.length;
+                    }
+                    
+                    if (board.connections instanceof Map) {
+                        totalConnections += board.connections.size;
+                    } else if (board.connections) {
+                        totalConnections += board.connections.length;
+                    }
+                });
+                
+                // Update current board stats
+                const currentNodes = this.nodes.size;
+                const currentConnections = this.connections.size;
+                
+                // Update display
+                document.getElementById('total-nodes').textContent = currentNodes;
+                document.getElementById('total-boards').textContent = this.boards.size;
+                document.getElementById('connections-count').textContent = currentConnections;
+                
+                // Update progress bar (connections vs nodes ratio)
+                const progress = currentNodes > 0 ? Math.min(100, Math.round((currentConnections / currentNodes) * 100)) : 0;
+                const progressBar = document.getElementById('progress-bar');
+                if (progressBar) {
+                    progressBar.style.width = progress + '%';
+                }
+            }
+            
+            saveBoards() {
+                // Save current board data
+                if (this.currentBoardId) {
+                    const currentBoard = this.boards.get(this.currentBoardId);
+                    if (currentBoard) {
+                        currentBoard.nodes = Array.from(this.nodes.values());
+                        currentBoard.connections = Array.from(this.connections.entries()).map(([id, conn]) => ({
+                            id,
+                            ...conn
+                        }));
+                        currentBoard.nodeIdCounter = this.nodeIdCounter;
+                    }
+                }
+                
+                // Save all boards
+                const boardsData = Array.from(this.boards.entries()).map(([id, board]) => ({
+                    id,
+                    name: board.name,
+                    nodes: board.nodes instanceof Map ? Array.from(board.nodes.values()) : board.nodes,
+                    connections: board.connections instanceof Map ? 
+                        Array.from(board.connections.entries()).map(([id, conn]) => ({id, ...conn})) : 
+                        board.connections,
+                    nodeIdCounter: board.nodeIdCounter,
+                    createdAt: board.createdAt
+                }));
+                
+                localStorage.setItem('mindMapBoards', JSON.stringify(boardsData));
+                localStorage.setItem('currentBoardId', this.currentBoardId);
+                localStorage.setItem('boardIdCounter', this.boardIdCounter.toString());
+            }
+            
+            loadBoards() {
+                const boardsData = localStorage.getItem('mindMapBoards');
+                const currentBoardId = localStorage.getItem('currentBoardId');
+                const boardIdCounter = localStorage.getItem('boardIdCounter');
+                
+                if (boardIdCounter) {
+                    this.boardIdCounter = parseInt(boardIdCounter);
+                }
+                
+                if (boardsData) {
+                    try {
+                        const boards = JSON.parse(boardsData);
+                        boards.forEach(board => {
+                            const nodesMap = new Map();
+                            const connectionsMap = new Map();
+                            
+                            if (board.nodes) {
+                                board.nodes.forEach(node => {
+                                    nodesMap.set(node.id, node);
+                                });
+                            }
+                            
+                            if (board.connections) {
+                                board.connections.forEach(conn => {
+                                    connectionsMap.set(conn.id, {
+                                        from: conn.from,
+                                        to: conn.to,
+                                        fromPos: conn.fromPos,
+                                        toPos: conn.toPos
+                                    });
+                                });
+                            }
+                            
+                            this.boards.set(board.id, {
+                                id: board.id,
+                                name: board.name,
+                                nodes: nodesMap,
+                                connections: connectionsMap,
+                                nodeIdCounter: board.nodeIdCounter || 0,
+                                createdAt: board.createdAt
+                            });
+                        });
+                        
+                        if (currentBoardId && this.boards.has(currentBoardId)) {
+                            this.currentBoardId = currentBoardId;
+                        }
+                    } catch (e) {
+                        console.error('Failed to load boards:', e);
+                    }
+                }
+            }
         }
+        
+        // Add fade animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0); }
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; transform: translateX(-50%) translateY(0); }
+                to { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            }
+        `;
+        document.head.appendChild(style);
         
         // Initialize MindMap
         const mindMap = new MindMap();

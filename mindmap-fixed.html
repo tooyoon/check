@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindFlow - 스마트 마인드맵</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #mindmap-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: grab;
+        }
+        
+        #mindmap-canvas.panning {
+            cursor: grabbing;
+        }
+        
+        .node {
+            position: absolute;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            cursor: move;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10;
+            user-select: none;
+            min-width: 120px;
+            text-align: center;
+            border: 2px solid transparent;
+            position: relative;
+        }
+        
+        .node:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            transform: scale(1.02);
+        }
+        
+        .node.selected {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+        
+        .node.root {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 18px;
+            padding: 16px 28px;
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+        }
+        
+        .node.level-1 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            font-weight: 500;
+            box-shadow: 0 6px 20px rgba(240, 147, 251, 0.3);
+        }
+        
+        .node.level-2 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.3);
+        }
+        
+        .node.level-3 {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(67, 233, 123, 0.3);
+        }
+        
+        .node.level-4 {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(250, 112, 154, 0.3);
+        }
+        
+        .node.level-5 {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            color: white;
+            box-shadow: 0 6px 20px rgba(48, 207, 208, 0.3);
+        }
+        
+        .node-text {
+            outline: none;
+            background: transparent;
+            border: none;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .node.root .node-text {
+            font-size: 18px;
+        }
+        
+        .connection-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #3b82f6;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: crosshair;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 15;
+        }
+        
+        .node:hover .connection-point {
+            opacity: 1;
+        }
+        
+        .connection-point.active {
+            opacity: 1;
+            transform: scale(1.5);
+            background: #10b981;
+        }
+        
+        .connection-point.right {
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .connection-point.left {
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+        
+        .connection-point.top {
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .connection-point.bottom {
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        
+        .delete-btn {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            z-index: 20;
+            border: 2px solid white;
+        }
+        
+        .node:hover .delete-btn {
+            display: flex;
+        }
+        
+        .toolbar {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        
+        .toolbar-btn {
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        
+        .toolbar-btn:hover {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+        
+        .sidebar-nav {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            background: white;
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+        
+        .nav-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+        }
+        
+        .zoom-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 100;
+        }
+        
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .zoom-btn:hover {
+            background: #f3f4f6;
+        }
+        
+        /* Color Palette */
+        .color-palette {
+            position: absolute;
+            bottom: -45px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            border-radius: 12px;
+            padding: 8px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: row;
+            gap: 6px;
+            z-index: 30;
+        }
+        
+        .node.selected .color-palette {
+            display: flex;
+        }
+        
+        .color-option {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .color-option:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+        
+        .color-option.gradient-1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .color-option.gradient-2 {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        .color-option.gradient-3 {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .color-option.gradient-4 {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+        
+        .color-option.gradient-5 {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+        
+        .color-option.gradient-6 {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+        }
+        
+        .color-option.gradient-7 {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+        }
+        
+        .color-option.gradient-8 {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation to TodoMaster -->
+    <div class="sidebar-nav">
+        <a href="todomaster_complete.html" class="nav-btn">
+            <span>📋</span>
+            <span>Todo List</span>
+        </a>
+    </div>
+    
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <button class="toolbar-btn" onclick="mindMap.addNode()">
+            <span>➕</span>
+            <span>노드 추가</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.centerView()">
+            <span>🎯</span>
+            <span>중앙 정렬</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.saveToLocal()">
+            <span>💾</span>
+            <span>저장</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.exportData()">
+            <span>📤</span>
+            <span>내보내기</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.importData()">
+            <span>📥</span>
+            <span>가져오기</span>
+        </button>
+        <button class="toolbar-btn" onclick="mindMap.clearAll()">
+            <span>🗑️</span>
+            <span>초기화</span>
+        </button>
+    </div>
+    
+    <!-- Zoom Controls -->
+    <div class="zoom-controls">
+        <button class="zoom-btn" onclick="mindMap.zoomIn()">
+            <span>➕</span>
+        </button>
+        <button class="zoom-btn" onclick="mindMap.resetZoom()">
+            <span>⟲</span>
+        </button>
+        <button class="zoom-btn" onclick="mindMap.zoomOut()">
+            <span>➖</span>
+        </button>
+    </div>
+    
+    <!-- Main Canvas Container -->
+    <div id="canvas-container">
+        <svg id="mindmap-canvas" width="5000" height="5000">
+            <g id="connections"></g>
+        </svg>
+        <div id="nodes-container"></div>
+    </div>
+    
+    <input type="file" id="file-input" accept=".json" style="display: none;">
+    
+    <script>
+        class MindMap {
+            constructor() {
+                this.nodes = new Map();
+                this.connections = new Map();
+                this.selectedNode = null;
+                this.draggedNode = null;
+                this.connectionDrag = null;
+                this.panStart = null;
+                this.viewOffset = { x: 0, y: 0 };
+                this.zoom = 1;
+                this.nodeIdCounter = 0;
+                this.canvas = document.getElementById('mindmap-canvas');
+                this.container = document.getElementById('canvas-container');
+                this.nodesContainer = document.getElementById('nodes-container');
+                this.connectionsGroup = document.getElementById('connections');
+                
+                this.init();
+            }
+            
+            init() {
+                // Load saved data
+                this.loadFromLocal();
+                
+                // If no saved data, create root node
+                if (this.nodes.size === 0) {
+                    this.createRootNode();
+                }
+                
+                // Setup event listeners
+                this.setupEventListeners();
+                
+                // Center view
+                setTimeout(() => this.centerView(), 100);
+            }
+            
+            createRootNode() {
+                const rootNode = {
+                    id: 'node_' + this.nodeIdCounter++,
+                    text: '중심 아이디어',
+                    x: 2500,
+                    y: 2500,
+                    level: 0,
+                    color: null
+                };
+                this.nodes.set(rootNode.id, rootNode);
+                this.renderNode(rootNode);
+            }
+            
+            setupEventListeners() {
+                // Canvas panning
+                this.canvas.addEventListener('mousedown', (e) => {
+                    if (e.target === this.canvas) {
+                        this.panStart = { x: e.clientX, y: e.clientY };
+                        this.canvas.classList.add('panning');
+                    }
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    if (this.panStart) {
+                        const dx = e.clientX - this.panStart.x;
+                        const dy = e.clientY - this.panStart.y;
+                        this.viewOffset.x += dx;
+                        this.viewOffset.y += dy;
+                        this.panStart = { x: e.clientX, y: e.clientY };
+                        this.updateView();
+                    }
+                    
+                    if (this.connectionDrag) {
+                        this.updateTempConnection(e);
+                    }
+                    
+                    if (this.draggedNode) {
+                        this.draggedNode.x = e.clientX - this.dragOffset.x - this.viewOffset.x;
+                        this.draggedNode.y = e.clientY - this.dragOffset.y - this.viewOffset.y;
+                        const nodeEl = document.getElementById(this.draggedNode.id);
+                        if (nodeEl) {
+                            nodeEl.style.left = this.draggedNode.x + 'px';
+                            nodeEl.style.top = this.draggedNode.y + 'px';
+                            this.updateConnections();
+                        }
+                    }
+                });
+                
+                document.addEventListener('mouseup', () => {
+                    this.panStart = null;
+                    this.canvas.classList.remove('panning');
+                    
+                    if (this.connectionDrag) {
+                        this.endConnectionDrag();
+                    }
+                    
+                    if (this.draggedNode) {
+                        this.draggedNode = null;
+                        this.saveToLocal();
+                    }
+                });
+                
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Delete' && this.selectedNode) {
+                        this.deleteNode(this.selectedNode);
+                    }
+                    if (e.key === 'Tab' && this.selectedNode) {
+                        e.preventDefault();
+                        this.addSiblingNode(this.selectedNode);
+                    }
+                    if (e.key === 'Enter' && this.selectedNode) {
+                        e.preventDefault();
+                        this.addChildNode(this.selectedNode);
+                    }
+                });
+            }
+            
+            renderNode(nodeData) {
+                const nodeEl = document.createElement('div');
+                nodeEl.className = 'node';
+                nodeEl.id = nodeData.id;
+                nodeEl.style.left = nodeData.x + 'px';
+                nodeEl.style.top = nodeData.y + 'px';
+                
+                // Add level class
+                if (nodeData.level === 0) {
+                    nodeEl.classList.add('root');
+                } else if (nodeData.level === 1) {
+                    nodeEl.classList.add('level-1');
+                } else if (nodeData.level === 2) {
+                    nodeEl.classList.add('level-2');
+                }
+                
+                // Node text
+                const textEl = document.createElement('input');
+                textEl.className = 'node-text';
+                textEl.value = nodeData.text;
+                textEl.addEventListener('input', (e) => {
+                    nodeData.text = e.target.value;
+                    this.saveToLocal();
+                });
+                textEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectNode(nodeData.id);
+                });
+                nodeEl.appendChild(textEl);
+                
+                // Connection points
+                ['top', 'right', 'bottom', 'left'].forEach(pos => {
+                    const point = document.createElement('div');
+                    point.className = `connection-point ${pos}`;
+                    
+                    // Start connection drag
+                    point.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.startConnectionDrag(nodeData.id, pos, e);
+                    });
+                    
+                    nodeEl.appendChild(point);
+                });
+                
+                // Delete button
+                if (nodeData.level !== 0) {
+                    const deleteBtn = document.createElement('div');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.innerHTML = '✕';
+                    deleteBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.deleteNode(nodeData.id);
+                    });
+                    nodeEl.appendChild(deleteBtn);
+                }
+                
+                // Node drag
+                nodeEl.addEventListener('mousedown', (e) => {
+                    if (e.target.classList.contains('connection-point') || 
+                        e.target.classList.contains('delete-btn') ||
+                        e.target.classList.contains('node-text')) return;
+                    
+                    this.draggedNode = nodeData;
+                    this.dragOffset = {
+                        x: e.clientX - nodeData.x - this.viewOffset.x,
+                        y: e.clientY - nodeData.y - this.viewOffset.y
+                    };
+                    this.selectNode(nodeData.id);
+                });
+                
+                this.nodesContainer.appendChild(nodeEl);
+            }
+            
+            startConnectionDrag(nodeId, position, event) {
+                this.connectionDrag = {
+                    fromNode: nodeId,
+                    fromPos: position,
+                    toNode: null,
+                    toPos: null
+                };
+                
+                // Create temp connection
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.id = 'temp-connection';
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', '#8b5cf6');
+                path.setAttribute('stroke-width', '3');
+                path.setAttribute('stroke-dasharray', '5,5');
+                path.setAttribute('stroke-linecap', 'round');
+                path.style.pointerEvents = 'none';
+                path.style.opacity = '0.8';
+                this.connectionsGroup.appendChild(path);
+                
+                // Add event listeners to all connection points
+                document.querySelectorAll('.connection-point').forEach(point => {
+                    point.addEventListener('mouseenter', this.handleConnectionPointEnter);
+                    point.addEventListener('mouseleave', this.handleConnectionPointLeave);
+                    point.addEventListener('mouseup', this.handleConnectionPointUp);
+                });
+                
+                this.updateTempConnection(event);
+            }
+            
+            handleConnectionPointEnter = (e) => {
+                if (!this.connectionDrag) return;
+                const nodeEl = e.target.closest('.node');
+                if (nodeEl && nodeEl.id !== this.connectionDrag.fromNode) {
+                    e.target.classList.add('active');
+                    this.connectionDrag.toNode = nodeEl.id;
+                    this.connectionDrag.toPos = e.target.className.split(' ').find(c => 
+                        ['top', 'right', 'bottom', 'left'].includes(c));
+                }
+            }
+            
+            handleConnectionPointLeave = (e) => {
+                e.target.classList.remove('active');
+                if (this.connectionDrag) {
+                    this.connectionDrag.toNode = null;
+                    this.connectionDrag.toPos = null;
+                }
+            }
+            
+            handleConnectionPointUp = (e) => {
+                if (!this.connectionDrag) return;
+                const nodeEl = e.target.closest('.node');
+                if (nodeEl && nodeEl.id !== this.connectionDrag.fromNode) {
+                    const toPos = e.target.className.split(' ').find(c => 
+                        ['top', 'right', 'bottom', 'left'].includes(c));
+                    this.createConnection(
+                        this.connectionDrag.fromNode,
+                        nodeEl.id,
+                        this.connectionDrag.fromPos,
+                        toPos
+                    );
+                }
+            }
+            
+            endConnectionDrag() {
+                // Remove temp connection
+                const tempPath = document.getElementById('temp-connection');
+                if (tempPath) tempPath.remove();
+                
+                // Remove event listeners
+                document.querySelectorAll('.connection-point').forEach(point => {
+                    point.classList.remove('active');
+                    point.removeEventListener('mouseenter', this.handleConnectionPointEnter);
+                    point.removeEventListener('mouseleave', this.handleConnectionPointLeave);
+                    point.removeEventListener('mouseup', this.handleConnectionPointUp);
+                });
+                
+                this.connectionDrag = null;
+            }
+            
+            updateTempConnection(e) {
+                const tempPath = document.getElementById('temp-connection');
+                if (!tempPath || !this.connectionDrag) return;
+                
+                const fromNode = this.nodes.get(this.connectionDrag.fromNode);
+                if (!fromNode) return;
+                
+                const fromPoint = this.getConnectionPoint(fromNode, this.connectionDrag.fromPos);
+                const toX = e.clientX - this.viewOffset.x;
+                const toY = e.clientY - this.viewOffset.y;
+                
+                // Bezier curve
+                const dx = toX - fromPoint.x;
+                const dy = toY - fromPoint.y;
+                const cx = fromPoint.x + dx * 0.5;
+                
+                const d = `M ${fromPoint.x} ${fromPoint.y} Q ${cx} ${fromPoint.y}, ${toX} ${toY}`;
+                tempPath.setAttribute('d', d);
+            }
+            
+            createConnection(fromNodeId, toNodeId, fromPos, toPos) {
+                const connectionId = `${fromNodeId}_${toNodeId}`;
+                const reverseConnectionId = `${toNodeId}_${fromNodeId}`;
+                
+                // Check if already exists
+                if (this.connections.has(connectionId) || this.connections.has(reverseConnectionId)) {
+                    return;
+                }
+                
+                const connection = {
+                    from: fromNodeId,
+                    to: toNodeId,
+                    fromPos: fromPos,
+                    toPos: toPos
+                };
+                
+                this.connections.set(connectionId, connection);
+                this.renderConnection(connectionId);
+                this.saveToLocal();
+            }
+            
+            renderConnection(connectionId) {
+                const connection = this.connections.get(connectionId);
+                if (!connection) return;
+                
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.id = `connection_${connectionId}`;
+                path.setAttribute('fill', 'none');
+                path.setAttribute('stroke', '#6b7280');
+                path.setAttribute('stroke-width', '2');
+                path.style.cursor = 'pointer';
+                
+                // Hover effects
+                path.addEventListener('mouseenter', () => {
+                    path.setAttribute('stroke', '#ef4444');
+                    path.setAttribute('stroke-width', '3');
+                });
+                
+                path.addEventListener('mouseleave', () => {
+                    path.setAttribute('stroke', '#6b7280');
+                    path.setAttribute('stroke-width', '2');
+                });
+                
+                // Click to delete
+                path.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm('이 연결을 삭제하시겠습니까?')) {
+                        this.deleteConnection(connectionId);
+                    }
+                });
+                
+                this.updateConnectionPath(path, connection);
+                this.connectionsGroup.appendChild(path);
+            }
+            
+            updateConnectionPath(path, connection) {
+                const fromNode = this.nodes.get(connection.from);
+                const toNode = this.nodes.get(connection.to);
+                if (!fromNode || !toNode) return;
+                
+                const fromPoint = this.getConnectionPoint(fromNode, connection.fromPos);
+                const toPoint = this.getConnectionPoint(toNode, connection.toPos);
+                
+                // Bezier curve
+                const dx = toPoint.x - fromPoint.x;
+                const dy = toPoint.y - fromPoint.y;
+                
+                let cx1, cy1, cx2, cy2;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    cx1 = fromPoint.x + dx * 0.5;
+                    cy1 = fromPoint.y;
+                    cx2 = fromPoint.x + dx * 0.5;
+                    cy2 = toPoint.y;
+                } else {
+                    cx1 = fromPoint.x;
+                    cy1 = fromPoint.y + dy * 0.5;
+                    cx2 = toPoint.x;
+                    cy2 = fromPoint.y + dy * 0.5;
+                }
+                
+                const d = `M ${fromPoint.x} ${fromPoint.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${toPoint.x} ${toPoint.y}`;
+                path.setAttribute('d', d);
+            }
+            
+            updateConnections() {
+                this.connections.forEach((connection, id) => {
+                    const path = document.getElementById(`connection_${id}`);
+                    if (path) {
+                        this.updateConnectionPath(path, connection);
+                    }
+                });
+            }
+            
+            getConnectionPoint(node, position) {
+                const nodeEl = document.getElementById(node.id);
+                if (!nodeEl) return { x: node.x + 60, y: node.y + 25 };
+                
+                const rect = nodeEl.getBoundingClientRect();
+                const width = rect.width / this.zoom;
+                const height = rect.height / this.zoom;
+                
+                switch(position) {
+                    case 'top':
+                        return { x: node.x + width / 2, y: node.y };
+                    case 'right':
+                        return { x: node.x + width, y: node.y + height / 2 };
+                    case 'bottom':
+                        return { x: node.x + width / 2, y: node.y + height };
+                    case 'left':
+                        return { x: node.x, y: node.y + height / 2 };
+                    default:
+                        return { x: node.x + width / 2, y: node.y + height / 2 };
+                }
+            }
+            
+            deleteConnection(connectionId) {
+                const path = document.getElementById(`connection_${connectionId}`);
+                if (path) path.remove();
+                this.connections.delete(connectionId);
+                this.saveToLocal();
+            }
+            
+            selectNode(nodeId) {
+                document.querySelectorAll('.node.selected').forEach(node => {
+                    node.classList.remove('selected');
+                });
+                
+                const nodeEl = document.getElementById(nodeId);
+                if (nodeEl) {
+                    nodeEl.classList.add('selected');
+                    this.selectedNode = nodeId;
+                }
+            }
+            
+            deleteNode(nodeId) {
+                const node = this.nodes.get(nodeId);
+                if (!node || node.level === 0) return;
+                
+                // Remove element
+                const nodeEl = document.getElementById(nodeId);
+                if (nodeEl) nodeEl.remove();
+                
+                // Remove connections
+                const toRemove = [];
+                this.connections.forEach((connection, id) => {
+                    if (connection.from === nodeId || connection.to === nodeId) {
+                        toRemove.push(id);
+                        const pathEl = document.getElementById(`connection_${id}`);
+                        if (pathEl) pathEl.remove();
+                    }
+                });
+                
+                toRemove.forEach(id => this.connections.delete(id));
+                this.nodes.delete(nodeId);
+                this.selectedNode = null;
+                this.saveToLocal();
+            }
+            
+            addNode(parentId = null) {
+                const newNode = {
+                    id: 'node_' + this.nodeIdCounter++,
+                    text: '새 아이디어',
+                    x: 2500 + Math.random() * 200 - 100,
+                    y: 2500 + Math.random() * 200 - 100,
+                    level: parentId ? (this.nodes.get(parentId)?.level || 0) + 1 : 1,
+                    color: null
+                };
+                
+                this.nodes.set(newNode.id, newNode);
+                this.renderNode(newNode);
+                
+                if (parentId && this.nodes.has(parentId)) {
+                    this.createConnection(parentId, newNode.id, 'right', 'left');
+                }
+                
+                this.selectNode(newNode.id);
+                this.saveToLocal();
+                
+                setTimeout(() => {
+                    const nodeEl = document.getElementById(newNode.id);
+                    const textInput = nodeEl.querySelector('.node-text');
+                    textInput.focus();
+                    textInput.select();
+                }, 50);
+            }
+            
+            addChildNode(parentId) {
+                if (!parentId) parentId = this.selectedNode;
+                if (!parentId) return;
+                
+                const parent = this.nodes.get(parentId);
+                if (!parent) return;
+                
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 150;
+                
+                const newNode = {
+                    id: 'node_' + this.nodeIdCounter++,
+                    text: '새 아이디어',
+                    x: parent.x + Math.cos(angle) * distance,
+                    y: parent.y + Math.sin(angle) * distance,
+                    level: parent.level + 1,
+                    color: null
+                };
+                
+                this.nodes.set(newNode.id, newNode);
+                this.renderNode(newNode);
+                this.createConnection(parentId, newNode.id, 'right', 'left');
+                this.selectNode(newNode.id);
+                this.saveToLocal();
+            }
+            
+            addSiblingNode(nodeId) {
+                if (!nodeId) nodeId = this.selectedNode;
+                if (!nodeId) return;
+                
+                const node = this.nodes.get(nodeId);
+                if (!node || node.level === 0) return;
+                
+                let parentId = null;
+                this.connections.forEach(connection => {
+                    if (connection.to === nodeId) {
+                        parentId = connection.from;
+                    }
+                });
+                
+                if (parentId) {
+                    this.addChildNode(parentId);
+                }
+            }
+            
+            centerView() {
+                if (this.nodes.size === 0) return;
+                
+                let minX = Infinity, minY = Infinity;
+                let maxX = -Infinity, maxY = -Infinity;
+                
+                this.nodes.forEach(node => {
+                    minX = Math.min(minX, node.x);
+                    minY = Math.min(minY, node.y);
+                    maxX = Math.max(maxX, node.x);
+                    maxY = Math.max(maxY, node.y);
+                });
+                
+                const centerX = (minX + maxX) / 2;
+                const centerY = (minY + maxY) / 2;
+                
+                this.viewOffset.x = window.innerWidth / 2 - centerX;
+                this.viewOffset.y = window.innerHeight / 2 - centerY;
+                
+                this.updateView();
+            }
+            
+            updateView() {
+                this.canvas.style.transform = `translate(${this.viewOffset.x}px, ${this.viewOffset.y}px) scale(${this.zoom})`;
+                this.nodesContainer.style.transform = `translate(${this.viewOffset.x}px, ${this.viewOffset.y}px) scale(${this.zoom})`;
+            }
+            
+            zoomIn() {
+                this.zoom = Math.min(2, this.zoom * 1.2);
+                this.updateView();
+            }
+            
+            zoomOut() {
+                this.zoom = Math.max(0.5, this.zoom / 1.2);
+                this.updateView();
+            }
+            
+            resetZoom() {
+                this.zoom = 1;
+                this.updateView();
+            }
+            
+            saveToLocal() {
+                const data = {
+                    nodes: Array.from(this.nodes.values()),
+                    connections: Array.from(this.connections.entries()).map(([id, conn]) => ({
+                        id,
+                        ...conn
+                    })),
+                    nodeIdCounter: this.nodeIdCounter
+                };
+                localStorage.setItem('mindMapData', JSON.stringify(data));
+            }
+            
+            loadFromLocal() {
+                const savedData = localStorage.getItem('mindMapData');
+                if (savedData) {
+                    try {
+                        const data = JSON.parse(savedData);
+                        
+                        data.nodes?.forEach(node => {
+                            this.nodes.set(node.id, node);
+                            this.renderNode(node);
+                        });
+                        
+                        data.connections?.forEach(conn => {
+                            this.connections.set(conn.id, {
+                                from: conn.from,
+                                to: conn.to,
+                                fromPos: conn.fromPos || 'right',
+                                toPos: conn.toPos || 'left'
+                            });
+                            this.renderConnection(conn.id);
+                        });
+                        
+                        this.nodeIdCounter = data.nodeIdCounter || 0;
+                    } catch (e) {
+                        console.error('Failed to load:', e);
+                    }
+                }
+            }
+            
+            exportData() {
+                const data = {
+                    nodes: Array.from(this.nodes.values()),
+                    connections: Array.from(this.connections.entries()).map(([id, conn]) => ({
+                        id,
+                        ...conn
+                    })),
+                    nodeIdCounter: this.nodeIdCounter,
+                    timestamp: new Date().toISOString()
+                };
+                
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `mindmap-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+            
+            importData() {
+                const input = document.getElementById('file-input');
+                input.click();
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const data = JSON.parse(e.target.result);
+                                this.clearAll(false);
+                                
+                                data.nodes?.forEach(node => {
+                                    this.nodes.set(node.id, node);
+                                    this.renderNode(node);
+                                });
+                                
+                                data.connections?.forEach(conn => {
+                                    this.connections.set(conn.id, {
+                                        from: conn.from,
+                                        to: conn.to,
+                                        fromPos: conn.fromPos || 'right',
+                                        toPos: conn.toPos || 'left'
+                                    });
+                                    this.renderConnection(conn.id);
+                                });
+                                
+                                this.nodeIdCounter = data.nodeIdCounter || 0;
+                                this.saveToLocal();
+                                this.centerView();
+                            } catch (err) {
+                                alert('파일을 불러올 수 없습니다.');
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                };
+            }
+            
+            clearAll(confirm = true) {
+                if (confirm && !window.confirm('모든 내용이 삭제됩니다. 계속하시겠습니까?')) {
+                    return;
+                }
+                
+                this.nodesContainer.innerHTML = '';
+                this.connectionsGroup.innerHTML = '';
+                this.nodes.clear();
+                this.connections.clear();
+                this.selectedNode = null;
+                this.nodeIdCounter = 0;
+                
+                this.createRootNode();
+                this.saveToLocal();
+                this.centerView();
+            }
+        }
+        
+        // Initialize
+        const mindMap = new MindMap();
+    </script>
+</body>
+</html>
