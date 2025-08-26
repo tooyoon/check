@@ -143,13 +143,17 @@
             <!-- Progress Chart -->
             <div class="glassmorphism rounded-3xl p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">주간 진행률</h3>
-                <canvas id="progress-chart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="progress-chart"></canvas>
+                </div>
             </div>
 
             <!-- Category Distribution -->
             <div class="glassmorphism rounded-3xl p-6">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">카테고리별 분포</h3>
-                <canvas id="category-chart" width="400" height="200"></canvas>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="category-chart"></canvas>
+                </div>
             </div>
         </div>
 
@@ -345,11 +349,41 @@
             return 0;
         }
 
+        // Store chart instances
+        let progressChart = null;
+        let categoryChart = null;
+        
         // Load charts
         function loadCharts() {
+            console.log('Loading charts...');
+            
+            // Get canvas elements
+            const progressCanvas = document.getElementById('progress-chart');
+            const categoryCanvas = document.getElementById('category-chart');
+            
+            // Clear previous charts completely
+            if (progressChart) {
+                progressChart.destroy();
+                progressChart = null;
+            }
+            if (categoryChart) {
+                categoryChart.destroy();
+                categoryChart = null;
+            }
+            
+            // Clear canvas content
+            if (progressCanvas) {
+                const progressCtx = progressCanvas.getContext('2d');
+                progressCtx.clearRect(0, 0, progressCanvas.width, progressCanvas.height);
+            }
+            if (categoryCanvas) {
+                const categoryCtx = categoryCanvas.getContext('2d');
+                categoryCtx.clearRect(0, 0, categoryCanvas.width, categoryCanvas.height);
+            }
+            
             // Weekly Progress Chart
             const progressCtx = document.getElementById('progress-chart').getContext('2d');
-            new Chart(progressCtx, {
+            progressChart = new Chart(progressCtx, {
                 type: 'line',
                 data: {
                     labels: ['월', '화', '수', '목', '금', '토', '일'],
@@ -379,7 +413,7 @@
 
             // Category Distribution Chart
             const categoryCtx = document.getElementById('category-chart').getContext('2d');
-            new Chart(categoryCtx, {
+            categoryChart = new Chart(categoryCtx, {
                 type: 'doughnut',
                 data: {
                     labels: ['업무', '개인', '학습', '기타'],
