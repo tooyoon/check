@@ -201,7 +201,7 @@ class UserManager {
             .single();
 
         if (error || !data) {
-            return [];
+            return null;
         }
 
         return data.data;
@@ -284,24 +284,34 @@ class SyncManager {
         this.updateSyncStatus('syncing');
 
         try {
-            // SIMPLE APPROACH: Cloud is the source of truth
-            // Load data from cloud and update local
-            console.log('Loading data from cloud...');
+            // Load the TodoMaster app data structure
+            const localData = localStorage.getItem('todoMasterApp');
+            let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
             
             // Load todos from cloud
             const cloudTodos = await this.userManager.loadTodos();
+            
             if (cloudTodos && cloudTodos.length > 0) {
                 console.log('Loaded todos from cloud:', cloudTodos);
+                // Update the local app data with cloud todos
+                appData.tasks = cloudTodos;
+                localStorage.setItem('todoMasterApp', JSON.stringify(appData));
+                
+                // Also update the old 'tasks' key for compatibility
                 localStorage.setItem('tasks', JSON.stringify(cloudTodos));
+                
                 if (window.updateTodoUI) {
                     window.updateTodoUI();
                 }
+                // Force reload to ensure UI updates
+                if (window.location.pathname.includes('index.html') || window.location.pathname === '/') {
+                    window.location.reload();
+                }
             } else {
-                console.log('No todos in cloud, keeping local data');
-                // If no cloud data, save local to cloud
-                const localTodos = localStorage.getItem('tasks');
-                if (localTodos) {
-                    await this.userManager.saveTodos(JSON.parse(localTodos));
+                console.log('No todos in cloud, saving local data');
+                // Save local data to cloud
+                if (appData.tasks && appData.tasks.length > 0) {
+                    await this.userManager.saveTodos(appData.tasks);
                 }
             }
 
@@ -374,13 +384,24 @@ class SyncManager {
     }
 
     handleTodoUpdate(data) {
-        // Update local storage with new data
+        // Update TodoMaster app data structure
+        const localData = localStorage.getItem('todoMasterApp');
+        let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
+        
+        // Update tasks
+        appData.tasks = data.data;
+        localStorage.setItem('todoMasterApp', JSON.stringify(appData));
+        
+        // Also update old 'tasks' key for compatibility
         localStorage.setItem('tasks', JSON.stringify(data.data));
         
         // Trigger UI update
         if (window.updateTodoUI) {
             window.updateTodoUI();
         }
+        
+        // Force reload to ensure UI updates with new data
+        window.location.reload();
         
         this.updateSyncStatus('synced');
     }
@@ -410,15 +431,13 @@ class SyncManager {
         this.updateSyncStatus('syncing');
         
         try {
-            // SIMPLE: Just save local data to cloud
-            // This ensures all devices see the same data
-            
-            const localTodos = localStorage.getItem('tasks');
-            if (localTodos) {
-                const todos = JSON.parse(localTodos);
-                if (todos.length > 0) {
-                    await this.userManager.saveTodos(todos);
-                    console.log('Saved todos to cloud:', todos);
+            // Get data from TodoMaster app structure
+            const localData = localStorage.getItem('todoMasterApp');
+            if (localData) {
+                const appData = JSON.parse(localData);
+                if (appData.tasks && appData.tasks.length > 0) {
+                    await this.userManager.saveTodos(appData.tasks);
+                    console.log('Saved todos to cloud:', appData.tasks);
                 }
             }
             
