@@ -859,10 +859,15 @@
                 
                 // Sync to Supabase immediately if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {
-                    // Save both categories and tasks to ensure full sync
-                    await window.userManager.saveCategories(this.data.categories);
-                    await window.userManager.saveTodos(this.data.tasks);
-                    window.syncManager.updateSyncStatus('synced');
+                    // Force immediate save to cloud
+                    try {
+                        await window.userManager.saveCategories(this.data.categories);
+                        await window.userManager.saveTodos(this.data.tasks);
+                        window.syncManager.updateSyncStatus('synced');
+                        console.log('Data saved to cloud immediately');
+                    } catch (error) {
+                        console.error('Failed to save to cloud:', error);
+                    }
                 }
             }
 
@@ -876,10 +881,15 @@
                 
                 // Sync to Supabase immediately if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {
-                    // Save both categories and tasks to ensure full sync
-                    await window.userManager.saveCategories(this.data.categories);
-                    await window.userManager.saveTodos(this.data.tasks);
-                    window.syncManager.updateSyncStatus('synced');
+                    // Force immediate save to cloud
+                    try {
+                        await window.userManager.saveCategories(this.data.categories);
+                        await window.userManager.saveTodos(this.data.tasks);
+                        window.syncManager.updateSyncStatus('synced');
+                        console.log('Data saved to cloud immediately');
+                    } catch (error) {
+                        console.error('Failed to save to cloud:', error);
+                    }
                 }
             }
 
@@ -1753,20 +1763,15 @@
             }, [fontSize]);
 
             async function loadAllData() {
-                let cats, tasks;
-                
-                // If authenticated, try to load from cloud first
-                if (userManager.isLoggedIn()) {
-                    const cloudTodos = await userManager.loadTodos();
-                    if (cloudTodos && cloudTodos.length > 0) {
-                        // Parse cloud data format to local format
-                        localStorage.setItem('tasks', JSON.stringify(cloudTodos));
-                    }
+                // Wait for sync to complete if user is logged in
+                if (userManager.isLoggedIn() && syncManager.syncStatus === 'syncing') {
+                    // Wait a bit for sync to complete
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
-                // Load from local storage
-                cats = await db.getCategories();
-                tasks = await db.getTasks();
+                // Load from local storage (which now has cloud data if logged in)
+                const cats = await db.getCategories();
+                const tasks = await db.getTasks();
                 
                 // 기존 작업들에 createdAt, updatedAt이 없으면 기본값 설정
                 const tasksWithDates = tasks.map(task => ({

@@ -322,23 +322,25 @@ class SyncManager {
             const localData = localStorage.getItem('todoMasterApp');
             let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
             
+            // ALWAYS prefer cloud data when available (for immediate sync)
+            
             // Load categories from cloud
             const cloudCategories = await this.userManager.loadCategories();
             if (cloudCategories && cloudCategories.length > 0) {
-                // Categories loaded from cloud
+                // Always use cloud data when available
                 appData.categories = cloudCategories;
             } else if (appData.categories && appData.categories.length > 0) {
-                // No categories in cloud, save local data
+                // Only save local if cloud is empty
                 await this.userManager.saveCategories(appData.categories);
             }
             
             // Load todos from cloud
             const cloudTodos = await this.userManager.loadTodos();
-            if (cloudTodos && cloudTodos.length > 0) {
-                // Todos loaded from cloud
-                appData.tasks = cloudTodos;
+            if (cloudTodos !== null) {  // Changed: check for null, not length
+                // Always use cloud data when available (even if empty array)
+                appData.tasks = cloudTodos || [];
             } else if (appData.tasks && appData.tasks.length > 0) {
-                // No todos in cloud, save local data
+                // Only save local if cloud has no data at all
                 await this.userManager.saveTodos(appData.tasks);
             }
             
@@ -369,7 +371,7 @@ class SyncManager {
                 }
             }
 
-            // Subscribe to todo changes
+            // Subscribe to todo changes with proper error handling
             this.todoSubscription = supabase
                 .channel('todos-channel')
                 .on(
@@ -381,10 +383,13 @@ class SyncManager {
                         filter: `user_id=eq.${this.userManager.currentUser.id}`
                     },
                     (payload) => {
+                        console.log('Todo change detected:', payload.eventType);
                         this.handleTodoUpdate(payload.new || payload.old);
                     }
                 )
-                .subscribe();
+                .subscribe((status) => {
+                    console.log('Todo subscription status:', status);
+                });
                 
             // Subscribe to category changes
             this.categorySubscription = supabase
