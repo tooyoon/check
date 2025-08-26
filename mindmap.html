@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MindFlow - 스마트 마인드맵</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -46,6 +48,98 @@
             box-shadow: 0 4px 20px rgba(168, 85, 247, 0.3);
         }
         
+        /* Authentication Styles */
+        .auth-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .auth-modal {
+            background: white;
+            border-radius: 1.5rem;
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .sync-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 280px;
+            padding: 8px 16px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .sync-indicator.syncing {
+            background: #fbbf24;
+            color: white;
+        }
+
+        .sync-indicator.synced {
+            background: #10b981;
+            color: white;
+        }
+
+        .sync-indicator.offline {
+            background: #ef4444;
+            color: white;
+        }
+
+        .user-profile-button {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            padding: 0.5rem;
+            min-width: 200px;
+            z-index: 50;
+            display: none;
+        }
+
+        .user-dropdown.show {
+            display: block;
+            animation: slideDown 0.2s ease;
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         #canvas-container {
             position: relative;
             width: 100%;
@@ -2712,8 +2806,230 @@
         `;
         document.head.appendChild(style);
         
-        // Initialize MindMap
-        const mindMap = new MindMap();
+        // Authentication Component
+        function AuthOverlay() {
+            const overlay = document.createElement('div');
+            overlay.className = 'auth-overlay';
+            overlay.innerHTML = `
+                <div class="auth-modal">
+                    <div class="text-center mb-8">
+                        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center mx-auto mb-4">
+                            <span class="text-3xl">🧠</span>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-2">MindFlow</h2>
+                        <p class="text-gray-600">모든 기기에서 동기화되는 스마트 마인드맵</p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <button id="google-signin-btn" class="w-full px-6 py-3 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 flex items-center justify-center gap-3 transition-all duration-200 shadow-sm hover:shadow-md">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            <span>Google로 계속하기</span>
+                        </button>
+
+                        <button id="local-storage-btn" class="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all duration-200">
+                            로컬 저장소로 계속하기
+                        </button>
+                    </div>
+
+                    <div id="auth-error" class="mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm hidden">
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-gray-200">
+                        <p class="text-xs text-gray-500 text-center">
+                            로그인하면 모든 기기에서 데이터가 자동으로 동기화됩니다.
+                            로컬 저장소를 사용하면 현재 브라우저에만 데이터가 저장됩니다.
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            setTimeout(() => {
+                const googleBtn = overlay.querySelector('#google-signin-btn');
+                const localBtn = overlay.querySelector('#local-storage-btn');
+                const errorDiv = overlay.querySelector('#auth-error');
+                
+                googleBtn.addEventListener('click', async () => {
+                    googleBtn.disabled = true;
+                    googleBtn.querySelector('span').textContent = '로그인 중...';
+                    try {
+                        await userManager.signInWithGoogle();
+                    } catch (err) {
+                        errorDiv.textContent = '로그인에 실패했습니다. 다시 시도해주세요.';
+                        errorDiv.classList.remove('hidden');
+                        googleBtn.disabled = false;
+                        googleBtn.querySelector('span').textContent = 'Google로 계속하기';
+                    }
+                });
+                
+                localBtn.addEventListener('click', () => {
+                    localStorage.setItem('skipAuth', 'true');
+                    overlay.remove();
+                    initMindMap();
+                });
+            }, 100);
+            
+            return overlay;
+        }
+        
+        // User Profile Component
+        function createUserProfile() {
+            const container = document.createElement('div');
+            container.className = 'user-profile-button mb-4';
+            
+            const user = userManager.currentUser;
+            const profile = userManager.userProfile;
+            
+            if (!user) return null;
+            
+            container.innerHTML = `
+                <button id="user-profile-btn" class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-all duration-200 w-full">
+                    ${profile?.avatar_url ? 
+                        `<img src="${profile.avatar_url}" class="w-8 h-8 rounded-full" />` :
+                        `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white text-sm font-bold">
+                            ${profile?.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                        </div>`
+                    }
+                    <span class="text-sm font-medium text-gray-700">
+                        ${profile?.full_name || user.email?.split('@')[0]}
+                    </span>
+                    <svg class="w-4 h-4 text-gray-500 ml-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <div id="user-dropdown" class="user-dropdown">
+                    <div class="p-3 border-b border-gray-100">
+                        <div class="text-sm font-medium text-gray-900">${profile?.full_name || ''}</div>
+                        <div class="text-xs text-gray-500">${user.email}</div>
+                        <div class="text-xs text-gray-400 mt-1">
+                            ${profile?.subscription_tier === 'free' ? '무료 플랜' : 
+                             profile?.subscription_tier === 'basic' ? '베이직 플랜' :
+                             profile?.subscription_tier === 'premium' ? '프리미엄 플랜' : '엔터프라이즈'}
+                        </div>
+                    </div>
+                    <div class="py-1">
+                        ${userManager.isAdmin() ? 
+                            '<a href="admin.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">🛠️ 관리자 패널</a>' : ''}
+                        <a href="dashboard.html" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">📊 대시보드</a>
+                        <button id="sync-btn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">🔄 동기화</button>
+                        <button id="signout-btn" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">🚪 로그아웃</button>
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            setTimeout(() => {
+                const profileBtn = container.querySelector('#user-profile-btn');
+                const dropdown = container.querySelector('#user-dropdown');
+                const syncBtn = container.querySelector('#sync-btn');
+                const signoutBtn = container.querySelector('#signout-btn');
+                
+                profileBtn?.addEventListener('click', () => {
+                    dropdown.classList.toggle('show');
+                });
+                
+                syncBtn?.addEventListener('click', async () => {
+                    await syncManager.syncAll();
+                });
+                
+                signoutBtn?.addEventListener('click', async () => {
+                    await userManager.signOut();
+                    window.location.reload();
+                });
+                
+                // Close dropdown when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!container.contains(e.target)) {
+                        dropdown.classList.remove('show');
+                    }
+                });
+            }, 100);
+            
+            return container;
+        }
+        
+        // Initialize MindMap with authentication
+        let mindMap;
+        
+        async function initMindMap() {
+            // Load data from cloud if authenticated
+            if (userManager.isLoggedIn()) {
+                const cloudMindmaps = await userManager.loadMindmaps();
+                if (cloudMindmaps) {
+                    localStorage.setItem('mindMapBoards', JSON.stringify(cloudMindmaps));
+                }
+                
+                // Initialize sync manager
+                await syncManager.initializeSync();
+                
+                // Set up real-time sync for mindmap updates
+                window.updateMindmapUI = () => {
+                    const storedBoards = localStorage.getItem('mindMapBoards');
+                    if (storedBoards && mindMap) {
+                        const boards = JSON.parse(storedBoards);
+                        mindMap.boards = new Map(boards.map(b => [b.id, b]));
+                        if (mindMap.currentBoardId && boards.find(b => b.id === mindMap.currentBoardId)) {
+                            mindMap.loadBoard(mindMap.currentBoardId);
+                        }
+                    }
+                };
+            }
+            
+            // Initialize MindMap
+            mindMap = new MindMap();
+            
+            // Add sync indicator
+            const syncIndicator = document.createElement('div');
+            syncIndicator.id = 'sync-indicator';
+            syncIndicator.className = 'sync-indicator offline';
+            syncIndicator.innerHTML = '<span>🔄</span><span>오프라인</span>';
+            document.body.appendChild(syncIndicator);
+            
+            // Add user profile to sidebar if logged in
+            if (userManager.isLoggedIn()) {
+                const sidebar = document.getElementById('sidebar');
+                const profileComponent = createUserProfile();
+                if (profileComponent && sidebar) {
+                    const titleElement = sidebar.querySelector('.p-6');
+                    if (titleElement) {
+                        titleElement.insertAdjacentElement('afterend', profileComponent);
+                    }
+                }
+            }
+            
+            // Update save function to sync with cloud
+            const originalSaveBoards = mindMap.saveBoards.bind(mindMap);
+            mindMap.saveBoards = async function() {
+                originalSaveBoards();
+                
+                // Sync with cloud if authenticated
+                if (userManager.isLoggedIn()) {
+                    const boardsArray = Array.from(this.boards.values());
+                    await userManager.saveMindmaps(boardsArray);
+                }
+            };
+        }
+        
+        // Check authentication on load
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session || localStorage.getItem('skipAuth')) {
+                // User is authenticated or chose to skip
+                initMindMap();
+            } else {
+                // Show auth overlay
+                document.body.appendChild(AuthOverlay());
+            }
+        }
+        
+        // Start the app
+        checkAuth();
     </script>
 </body>
 </html>

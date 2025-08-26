@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 패널 - TodoMaster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="supabase-config.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+        
+        .glassmorphism {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .sidebar {
+            width: 280px;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            background: linear-gradient(180deg, #1f2937 0%, #111827 100%);
+            color: white;
+            overflow-y: auto;
+        }
+        
+        .main-content {
+            margin-left: 280px;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+        
+        .nav-item {
+            transition: all 0.2s ease;
+        }
+        
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .nav-item.active {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.3) 0%, transparent 100%);
+            border-left: 3px solid #3b82f6;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .status-active {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-inactive {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .status-trial {
+            background: #f59e0b;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar p-6">
+        <div class="mb-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <span class="text-white text-lg font-bold">✓</span>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold">TodoMaster</h1>
+                    <p class="text-xs text-gray-400">관리자 패널</p>
+                </div>
+            </div>
+            
+            <nav class="space-y-2">
+                <a href="#dashboard" class="nav-item active block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>📊</span>
+                    <span>대시보드</span>
+                </a>
+                <a href="#users" class="nav-item block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>👥</span>
+                    <span>사용자 관리</span>
+                </a>
+                <a href="#subscriptions" class="nav-item block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>💳</span>
+                    <span>구독 관리</span>
+                </a>
+                <a href="#analytics" class="nav-item block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>📈</span>
+                    <span>분석</span>
+                </a>
+                <a href="#feedback" class="nav-item block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>💬</span>
+                    <span>피드백</span>
+                </a>
+                <a href="#settings" class="nav-item block px-4 py-3 rounded-lg flex items-center gap-3">
+                    <span>⚙️</span>
+                    <span>설정</span>
+                </a>
+            </nav>
+        </div>
+        
+        <div class="border-t border-gray-700 pt-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div id="admin-avatar" class="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                    <span>A</span>
+                </div>
+                <div>
+                    <div id="admin-name" class="text-sm font-medium">관리자</div>
+                    <div id="admin-email" class="text-xs text-gray-400">admin@todomaster.com</div>
+                </div>
+            </div>
+            <button onclick="signOut()" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors">
+                로그아웃
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content p-8">
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="section">
+            <h2 class="text-3xl font-bold text-gray-800 mb-8">대시보드</h2>
+            
+            <!-- Stats Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="glassmorphism rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span class="text-2xl">👥</span>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-bold text-gray-800" id="total-users">0</div>
+                    <div class="text-sm text-gray-600 mt-1">전체 사용자</div>
+                    <div class="text-xs text-green-600 mt-2">+12% 이번 달</div>
+                </div>
+
+                <div class="glassmorphism rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <span class="text-2xl">💰</span>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-bold text-gray-800" id="revenue">₩0</div>
+                    <div class="text-sm text-gray-600 mt-1">월 수익</div>
+                    <div class="text-xs text-green-600 mt-2">+8% 이번 달</div>
+                </div>
+
+                <div class="glassmorphism rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                            <span class="text-2xl">💳</span>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-bold text-gray-800" id="active-subs">0</div>
+                    <div class="text-sm text-gray-600 mt-1">활성 구독</div>
+                    <div class="text-xs text-green-600 mt-2">+5% 이번 달</div>
+                </div>
+
+                <div class="glassmorphism rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                            <span class="text-2xl">📊</span>
+                        </div>
+                    </div>
+                    <div class="text-3xl font-bold text-gray-800" id="engagement">87%</div>
+                    <div class="text-sm text-gray-600 mt-1">참여율</div>
+                    <div class="text-xs text-green-600 mt-2">+2% 이번 달</div>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="glassmorphism rounded-3xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">사용자 증가 추이</h3>
+                    <canvas id="users-chart" width="400" height="200"></canvas>
+                </div>
+                <div class="glassmorphism rounded-3xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">수익 추이</h3>
+                    <canvas id="revenue-chart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Users Section -->
+        <section id="users-section" class="section hidden">
+            <div class="flex items-center justify-between mb-8">
+                <h2 class="text-3xl font-bold text-gray-800">사용자 관리</h2>
+                <div class="flex gap-4">
+                    <input type="text" id="user-search" placeholder="사용자 검색..." 
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="user-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">전체</option>
+                        <option value="free">무료</option>
+                        <option value="basic">베이직</option>
+                        <option value="premium">프리미엄</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="glassmorphism rounded-3xl overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">사용자</th>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">이메일</th>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">플랜</th>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">가입일</th>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">상태</th>
+                            <th class="px-6 py-4 text-left text-sm font-medium text-gray-700">작업</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-table-body" class="divide-y divide-gray-200">
+                        <!-- User rows will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Subscriptions Section -->
+        <section id="subscriptions-section" class="section hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-8">구독 관리</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">무료 플랜</h3>
+                    <div class="text-3xl font-bold text-gray-800 mb-2" id="free-users">0</div>
+                    <div class="text-sm text-gray-600">사용자</div>
+                </div>
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">베이직 플랜</h3>
+                    <div class="text-3xl font-bold text-gray-800 mb-2" id="basic-users">0</div>
+                    <div class="text-sm text-gray-600">사용자</div>
+                    <div class="text-sm text-green-600 mt-2">₩0 월 수익</div>
+                </div>
+                <div class="glassmorphism rounded-2xl p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">프리미엄 플랜</h3>
+                    <div class="text-3xl font-bold text-gray-800 mb-2" id="premium-users">0</div>
+                    <div class="text-sm text-gray-600">사용자</div>
+                    <div class="text-sm text-green-600 mt-2">₩0 월 수익</div>
+                </div>
+            </div>
+
+            <div class="glassmorphism rounded-3xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">최근 구독 활동</h3>
+                <div id="subscription-activity" class="space-y-3">
+                    <!-- Subscription activities will be inserted here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics-section" class="section hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-8">분석</h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <div class="glassmorphism rounded-3xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">일일 활성 사용자</h3>
+                    <canvas id="dau-chart" width="400" height="200"></canvas>
+                </div>
+                <div class="glassmorphism rounded-3xl p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">기능별 사용률</h3>
+                    <canvas id="feature-chart" width="400" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="glassmorphism rounded-3xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">핵심 지표</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <div class="text-sm text-gray-600 mb-2">평균 세션 시간</div>
+                        <div class="text-2xl font-bold text-gray-800">15분 32초</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600 mb-2">일일 평균 작업 수</div>
+                        <div class="text-2xl font-bold text-gray-800">8.5개</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600 mb-2">전환율</div>
+                        <div class="text-2xl font-bold text-gray-800">3.2%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feedback Section -->
+        <section id="feedback-section" class="section hidden">
+            <h2 class="text-3xl font-bold text-gray-800 mb-8">사용자 피드백</h2>
+            
+            <div class="glassmorphism rounded-3xl p-6">
+                <div class="flex gap-4 mb-6">
+                    <select id="feedback-filter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">전체</option>
+                        <option value="pending">대기중</option>
+                        <option value="reviewing">검토중</option>
+                        <option value="resolved">해결됨</option>
+                    </select>
+                    <select id="feedback-type" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="all">모든 유형</option>
+                        <option value="bug">버그</option>
+                        <option value="feature">기능 요청</option>
+                        <option value="general">일반</option>
+                    </select>
+                </div>
+
+                <div id="feedback-list" class="space-y-4">
+                    <!-- Feedback items will be inserted here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Check if user is admin
+        async function checkAdminAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Check if user is admin
+            if (!userManager.isAdmin()) {
+                alert('관리자 권한이 필요합니다.');
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            
+            // Load admin data
+            loadAdminData();
+        }
+
+        // Load admin data
+        async function loadAdminData() {
+            // Update admin profile
+            const profile = userManager.userProfile;
+            if (profile) {
+                document.getElementById('admin-name').textContent = profile.full_name || 'Admin';
+                document.getElementById('admin-email').textContent = profile.email;
+                if (profile.avatar_url) {
+                    document.getElementById('admin-avatar').innerHTML = `<img src="${profile.avatar_url}" class="w-10 h-10 rounded-full">`;
+                }
+            }
+
+            // Load dashboard data
+            loadDashboardData();
+            
+            // Setup navigation
+            setupNavigation();
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            // Fetch users count
+            const { count: usersCount } = await supabase
+                .from('user_profiles')
+                .select('*', { count: 'exact', head: true });
+            document.getElementById('total-users').textContent = usersCount || 0;
+
+            // Fetch subscriptions
+            const { data: subscriptions } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('status', 'active');
+            
+            const activeSubs = subscriptions?.length || 0;
+            document.getElementById('active-subs').textContent = activeSubs;
+            
+            // Calculate revenue
+            const revenue = subscriptions?.reduce((total, sub) => {
+                if (sub.tier === 'basic') return total + 5900;
+                if (sub.tier === 'premium') return total + 12900;
+                return total;
+            }, 0) || 0;
+            document.getElementById('revenue').textContent = `₩${revenue.toLocaleString()}`;
+
+            // Load charts
+            loadCharts();
+        }
+
+        // Load charts
+        function loadCharts() {
+            // Users growth chart
+            const usersCtx = document.getElementById('users-chart')?.getContext('2d');
+            if (usersCtx) {
+                new Chart(usersCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1월', '2월', '3월', '4월', '5월', '6월'],
+                        datasets: [{
+                            label: '사용자',
+                            data: [100, 150, 200, 280, 350, 420],
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+
+            // Revenue chart
+            const revenueCtx = document.getElementById('revenue-chart')?.getContext('2d');
+            if (revenueCtx) {
+                new Chart(revenueCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['1월', '2월', '3월', '4월', '5월', '6월'],
+                        datasets: [{
+                            label: '수익',
+                            data: [500000, 750000, 1000000, 1400000, 1800000, 2200000],
+                            backgroundColor: 'rgba(34, 197, 94, 0.8)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+
+        // Setup navigation
+        function setupNavigation() {
+            const navItems = document.querySelectorAll('.nav-item');
+            const sections = document.querySelectorAll('.section');
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    // Update active nav
+                    navItems.forEach(nav => nav.classList.remove('active'));
+                    item.classList.add('active');
+                    
+                    // Show corresponding section
+                    const targetSection = item.getAttribute('href').replace('#', '') + '-section';
+                    sections.forEach(section => {
+                        if (section.id === targetSection) {
+                            section.classList.remove('hidden');
+                            // Load section-specific data
+                            if (targetSection === 'users-section') loadUsers();
+                            if (targetSection === 'subscriptions-section') loadSubscriptions();
+                            if (targetSection === 'analytics-section') loadAnalytics();
+                            if (targetSection === 'feedback-section') loadFeedback();
+                        } else {
+                            section.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+        }
+
+        // Load users
+        async function loadUsers() {
+            const { data: users } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
+            
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = users?.map(user => `
+                <tr>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            ${user.avatar_url ? 
+                                `<img src="${user.avatar_url}" class="w-10 h-10 rounded-full">` :
+                                `<div class="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-bold">
+                                    ${user.full_name?.charAt(0) || user.email?.charAt(0).toUpperCase()}
+                                </div>`
+                            }
+                            <div>
+                                <div class="font-medium text-gray-900">${user.full_name || '이름 없음'}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-gray-600">${user.email}</td>
+                    <td class="px-6 py-4">
+                        <span class="status-badge ${user.subscription_tier === 'premium' ? 'bg-purple-500' : 
+                                                   user.subscription_tier === 'basic' ? 'bg-blue-500' : 
+                                                   'bg-gray-400'} text-white">
+                            ${user.subscription_tier === 'free' ? '무료' :
+                              user.subscription_tier === 'basic' ? '베이직' :
+                              user.subscription_tier === 'premium' ? '프리미엄' : '엔터프라이즈'}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-gray-600">${new Date(user.created_at).toLocaleDateString('ko-KR')}</td>
+                    <td class="px-6 py-4">
+                        <span class="status-badge status-active">활성</span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <button class="text-blue-600 hover:text-blue-800 mr-3">보기</button>
+                        <button class="text-gray-600 hover:text-gray-800">편집</button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="6" class="text-center py-8 text-gray-500">사용자가 없습니다.</td></tr>';
+        }
+
+        // Load subscriptions
+        async function loadSubscriptions() {
+            const { data: users } = await supabase
+                .from('user_profiles')
+                .select('subscription_tier');
+            
+            const counts = {
+                free: users?.filter(u => u.subscription_tier === 'free').length || 0,
+                basic: users?.filter(u => u.subscription_tier === 'basic').length || 0,
+                premium: users?.filter(u => u.subscription_tier === 'premium').length || 0
+            };
+            
+            document.getElementById('free-users').textContent = counts.free;
+            document.getElementById('basic-users').textContent = counts.basic;
+            document.getElementById('premium-users').textContent = counts.premium;
+        }
+
+        // Load analytics
+        function loadAnalytics() {
+            // DAU chart
+            const dauCtx = document.getElementById('dau-chart')?.getContext('2d');
+            if (dauCtx) {
+                new Chart(dauCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['월', '화', '수', '목', '금', '토', '일'],
+                        datasets: [{
+                            label: 'DAU',
+                            data: [320, 340, 310, 350, 380, 290, 310],
+                            borderColor: 'rgb(168, 85, 247)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+
+            // Feature usage chart
+            const featureCtx = document.getElementById('feature-chart')?.getContext('2d');
+            if (featureCtx) {
+                new Chart(featureCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['체크리스트', '마인드맵', '동기화', '공유'],
+                        datasets: [{
+                            data: [45, 30, 20, 5],
+                            backgroundColor: [
+                                'rgb(59, 130, 246)',
+                                'rgb(168, 85, 247)',
+                                'rgb(236, 72, 153)',
+                                'rgb(251, 191, 36)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+        }
+
+        // Load feedback
+        async function loadFeedback() {
+            const { data: feedback } = await supabase
+                .from('feedback')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+            
+            const feedbackList = document.getElementById('feedback-list');
+            feedbackList.innerHTML = feedback?.map(item => `
+                <div class="bg-white rounded-xl p-4 border border-gray-200">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-900">
+                            ${item.type === 'bug' ? '🐛 버그' :
+                              item.type === 'feature' ? '✨ 기능 요청' :
+                              item.type === 'general' ? '💬 일반' : '⚠️ 불만'}
+                        </span>
+                        <span class="status-badge ${item.status === 'resolved' ? 'bg-green-500' :
+                                                    item.status === 'reviewing' ? 'bg-yellow-500' :
+                                                    'bg-gray-400'} text-white">
+                            ${item.status === 'pending' ? '대기중' :
+                              item.status === 'reviewing' ? '검토중' :
+                              item.status === 'resolved' ? '해결됨' : '닫힘'}
+                        </span>
+                    </div>
+                    <p class="text-gray-700 mb-2">${item.message}</p>
+                    <div class="text-xs text-gray-500">
+                        ${new Date(item.created_at).toLocaleString('ko-KR')}
+                    </div>
+                    ${item.response ? `
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <div class="text-sm text-gray-600">답변:</div>
+                            <p class="text-sm text-gray-700">${item.response}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('') || '<div class="text-center py-8 text-gray-500">피드백이 없습니다.</div>';
+        }
+
+        // Sign out
+        async function signOut() {
+            await userManager.signOut();
+            window.location.href = 'index.html';
+        }
+
+        // Initialize
+        checkAdminAuth();
+    </script>
+</body>
+</html>

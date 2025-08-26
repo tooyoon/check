@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>대시보드 - TodoMaster</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="supabase-config.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+            box-sizing: border-box;
+        }
+        
+        .glassmorphism {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stat-card {
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="index.html" class="flex items-center gap-2">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                            <span class="text-white text-lg font-bold">✓</span>
+                        </div>
+                        <h1 class="text-xl font-bold text-gray-800">TodoMaster</h1>
+                    </a>
+                    <span class="text-gray-400">|</span>
+                    <h2 class="text-lg font-semibold text-gray-700">대시보드</h2>
+                </div>
+                <nav class="flex items-center gap-4">
+                    <a href="index.html" class="text-gray-600 hover:text-gray-900">체크리스트</a>
+                    <a href="mindmap.html" class="text-gray-600 hover:text-gray-900">마인드맵</a>
+                    <div id="user-info" class="flex items-center gap-2">
+                        <!-- User profile will be inserted here -->
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- Welcome Section -->
+        <div class="glassmorphism rounded-3xl p-8 mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 id="welcome-message" class="text-3xl font-bold text-gray-800 mb-2">
+                        환영합니다!
+                    </h1>
+                    <p class="text-gray-600">생산성을 한눈에 확인하세요</p>
+                </div>
+                <div id="subscription-badge" class="px-4 py-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium">
+                    무료 플랜
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <!-- Total Tasks -->
+            <div class="stat-card glassmorphism rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center">
+                        <span class="text-2xl">📋</span>
+                    </div>
+                    <span class="text-sm text-gray-500">전체</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="total-tasks">-</div>
+                <div class="text-sm text-gray-600 mt-1">전체 작업</div>
+            </div>
+
+            <!-- Completed Tasks -->
+            <div class="stat-card glassmorphism rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                        <span class="text-2xl">✅</span>
+                    </div>
+                    <span class="text-sm text-gray-500">완료</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="completed-tasks">-</div>
+                <div class="text-sm text-gray-600 mt-1">완료된 작업</div>
+            </div>
+
+            <!-- Mindmaps -->
+            <div class="stat-card glassmorphism rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center">
+                        <span class="text-2xl">🧠</span>
+                    </div>
+                    <span class="text-sm text-gray-500">마인드맵</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="total-mindmaps">-</div>
+                <div class="text-sm text-gray-600 mt-1">마인드맵</div>
+            </div>
+
+            <!-- Streak -->
+            <div class="stat-card glassmorphism rounded-2xl p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                        <span class="text-2xl">🔥</span>
+                    </div>
+                    <span class="text-sm text-gray-500">연속</span>
+                </div>
+                <div class="text-3xl font-bold text-gray-800" id="streak-days">-</div>
+                <div class="text-sm text-gray-600 mt-1">일 연속</div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Progress Chart -->
+            <div class="glassmorphism rounded-3xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">주간 진행률</h3>
+                <canvas id="progress-chart" width="400" height="200"></canvas>
+            </div>
+
+            <!-- Category Distribution -->
+            <div class="glassmorphism rounded-3xl p-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">카테고리별 분포</h3>
+                <canvas id="category-chart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="glassmorphism rounded-3xl p-6 mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">최근 활동</h3>
+            <div id="recent-activities" class="space-y-3">
+                <!-- Activities will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Subscription Section -->
+        <div class="glassmorphism rounded-3xl p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-gray-800">구독 정보</h3>
+                <button id="upgrade-btn" class="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all duration-200">
+                    업그레이드
+                </button>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Free Plan -->
+                <div class="border border-gray-200 rounded-2xl p-6">
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">무료</h4>
+                    <p class="text-3xl font-bold text-gray-800 mb-4">₩0<span class="text-sm font-normal text-gray-600">/월</span></p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            무제한 작업
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            3개 마인드맵
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            기본 동기화
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Basic Plan -->
+                <div class="border border-blue-500 rounded-2xl p-6 relative">
+                    <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 px-3 py-1 bg-blue-500 text-white text-xs rounded-full">
+                        인기
+                    </div>
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">베이직</h4>
+                    <p class="text-3xl font-bold text-gray-800 mb-4">₩5,900<span class="text-sm font-normal text-gray-600">/월</span></p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            무제한 작업
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            무제한 마인드맵
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            실시간 동기화
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            이미지 첨부
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Premium Plan -->
+                <div class="border border-gray-200 rounded-2xl p-6">
+                    <h4 class="text-lg font-bold text-gray-800 mb-2">프리미엄</h4>
+                    <p class="text-3xl font-bold text-gray-800 mb-4">₩12,900<span class="text-sm font-normal text-gray-600">/월</span></p>
+                    <ul class="space-y-2 text-sm text-gray-600">
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            베이직의 모든 기능
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            팀 협업
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            AI 추천
+                        </li>
+                        <li class="flex items-center gap-2">
+                            <span class="text-green-500">✓</span>
+                            우선 지원
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Check authentication
+        async function checkAuth() {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // Load user data
+            await loadDashboardData();
+        }
+
+        // Load dashboard data
+        async function loadDashboardData() {
+            // Get user profile
+            const profile = userManager.userProfile;
+            if (profile) {
+                document.getElementById('welcome-message').textContent = `환영합니다, ${profile.full_name || profile.email}님!`;
+                
+                // Update subscription badge
+                const tier = profile.subscription_tier || 'free';
+                const badge = document.getElementById('subscription-badge');
+                badge.textContent = tier === 'free' ? '무료 플랜' :
+                                   tier === 'basic' ? '베이직 플랜' :
+                                   tier === 'premium' ? '프리미엄 플랜' : '엔터프라이즈';
+                
+                // Update user info
+                const userInfo = document.getElementById('user-info');
+                userInfo.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        ${profile.avatar_url ? 
+                            `<img src="${profile.avatar_url}" class="w-8 h-8 rounded-full">` :
+                            `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
+                                ${profile.full_name?.charAt(0) || profile.email?.charAt(0).toUpperCase()}
+                            </div>`
+                        }
+                        <span class="text-sm font-medium text-gray-700">${profile.full_name || profile.email}</span>
+                        <button onclick="signOut()" class="text-sm text-gray-500 hover:text-gray-700 ml-4">로그아웃</button>
+                    </div>
+                `;
+            }
+
+            // Load statistics
+            await loadStatistics();
+            
+            // Load charts
+            loadCharts();
+            
+            // Load recent activities
+            loadRecentActivities();
+        }
+
+        // Load user statistics
+        async function loadStatistics() {
+            // Get user stats from database
+            const stats = await analyticsManager.getUserStats();
+            
+            // Load local data as fallback
+            const localTasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+            const localMindmaps = JSON.parse(localStorage.getItem('mindMapBoards') || '[]');
+            
+            // Update stats display
+            document.getElementById('total-tasks').textContent = stats?.total_todos || localTasks.length || 0;
+            document.getElementById('completed-tasks').textContent = stats?.completed_todos || localTasks.filter(t => t.checked).length || 0;
+            document.getElementById('total-mindmaps').textContent = stats?.total_mindmaps || localMindmaps.length || 0;
+            document.getElementById('streak-days').textContent = stats?.streak_days || 0;
+        }
+
+        // Load charts
+        function loadCharts() {
+            // Weekly Progress Chart
+            const progressCtx = document.getElementById('progress-chart').getContext('2d');
+            new Chart(progressCtx, {
+                type: 'line',
+                data: {
+                    labels: ['월', '화', '수', '목', '금', '토', '일'],
+                    datasets: [{
+                        label: '완료된 작업',
+                        data: [12, 19, 3, 5, 2, 3, 7],
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Category Distribution Chart
+            const categoryCtx = document.getElementById('category-chart').getContext('2d');
+            new Chart(categoryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['업무', '개인', '학습', '기타'],
+                    datasets: [{
+                        data: [30, 20, 25, 25],
+                        backgroundColor: [
+                            'rgb(59, 130, 246)',
+                            'rgb(168, 85, 247)',
+                            'rgb(236, 72, 153)',
+                            'rgb(251, 191, 36)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Load recent activities
+        function loadRecentActivities() {
+            const activities = [
+                { icon: '✅', text: '프로젝트 보고서 작성 완료', time: '10분 전' },
+                { icon: '🧠', text: '새로운 마인드맵 생성: 2024 목표', time: '1시간 전' },
+                { icon: '📋', text: '5개 작업 추가', time: '3시간 전' },
+                { icon: '✅', text: '회의 준비 완료', time: '오늘' },
+                { icon: '🧠', text: '마인드맵 수정: 프로젝트 계획', time: '어제' }
+            ];
+
+            const container = document.getElementById('recent-activities');
+            container.innerHTML = activities.map(activity => `
+                <div class="flex items-center justify-between p-3 bg-white/50 rounded-xl">
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${activity.icon}</span>
+                        <span class="text-gray-700">${activity.text}</span>
+                    </div>
+                    <span class="text-sm text-gray-500">${activity.time}</span>
+                </div>
+            `).join('');
+        }
+
+        // Sign out
+        async function signOut() {
+            await userManager.signOut();
+            window.location.href = 'index.html';
+        }
+
+        // Initialize dashboard
+        checkAuth();
+    </script>
+</body>
+</html>
