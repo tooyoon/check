@@ -375,13 +375,30 @@ class SyncManager {
                 .on(
                     'postgres_changes',
                     {
-                        event: 'UPDATE',
+                        event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
                         schema: 'public',
                         table: 'todos',
                         filter: `user_id=eq.${this.userManager.currentUser.id}`
                     },
                     (payload) => {
-                        this.handleTodoUpdate(payload.new);
+                        this.handleTodoUpdate(payload.new || payload.old);
+                    }
+                )
+                .subscribe();
+                
+            // Subscribe to category changes
+            this.categorySubscription = supabase
+                .channel('categories-channel')
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*', // Listen to all events
+                        schema: 'public',
+                        table: 'categories',
+                        filter: `user_id=eq.${this.userManager.currentUser.id}`
+                    },
+                    (payload) => {
+                        this.handleCategoryUpdate(payload.new || payload.old);
                     }
                 )
                 .subscribe();
@@ -392,13 +409,13 @@ class SyncManager {
                 .on(
                     'postgres_changes',
                     {
-                        event: 'UPDATE',
+                        event: '*', // Listen to all events
                         schema: 'public',
                         table: 'mindmaps',
                         filter: `user_id=eq.${this.userManager.currentUser.id}`
                     },
                     (payload) => {
-                        this.handleMindmapUpdate(payload.new);
+                        this.handleMindmapUpdate(payload.new || payload.old);
                     }
                 )
                 .subscribe();
@@ -421,6 +438,10 @@ class SyncManager {
     }
 
     handleTodoUpdate(data) {
+        if (!data || !data.data) return;
+        
+        console.log('Received real-time todo update from cloud');
+        
         // Update TodoMaster app data structure
         const localData = localStorage.getItem('todoMasterApp');
         let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
@@ -432,12 +453,25 @@ class SyncManager {
         // Also update old 'tasks' key for compatibility
         localStorage.setItem('tasks', JSON.stringify(data.data));
         
-        // Trigger UI update
-        if (window.updateTodoUI) {
-            window.updateTodoUI();
-        }
+        // Force reload to ensure UI is fully updated with new data
+        window.location.reload();
+    }
+    
+    handleCategoryUpdate(data) {
+        if (!data || !data.data) return;
         
-        this.updateSyncStatus('synced');
+        console.log('Received real-time category update from cloud');
+        
+        // Update TodoMaster app data structure
+        const localData = localStorage.getItem('todoMasterApp');
+        let appData = localData ? JSON.parse(localData) : { categories: [], tasks: [] };
+        
+        // Update categories
+        appData.categories = data.data;
+        localStorage.setItem('todoMasterApp', JSON.stringify(appData));
+        
+        // Force reload to ensure UI is fully updated with new data
+        window.location.reload();
     }
 
     handleMindmapUpdate(data) {
@@ -453,12 +487,12 @@ class SyncManager {
     }
 
     startAutoSync() {
-        // Auto sync every 30 seconds
+        // Auto sync every 5 seconds for better real-time experience
         setInterval(() => {
             if (this.userManager.isLoggedIn() && this.userManager.userProfile?.settings?.auto_sync) {
                 this.syncAll();
             }
-        }, 30000);
+        }, 5000); // Changed from 30 seconds to 5 seconds
     }
 
     async syncAll() {
@@ -600,6 +634,9 @@ class SyncManager {
     cleanup() {
         if (this.todoSubscription) {
             supabase.removeChannel(this.todoSubscription);
+        }
+        if (this.categorySubscription) {
+            supabase.removeChannel(this.categorySubscription);
         }
         if (this.mindmapSubscription) {
             supabase.removeChannel(this.mindmapSubscription);

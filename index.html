@@ -851,10 +851,13 @@
                 }
                 await this.saveData();
                 
-                // Sync to Supabase if logged in
+                // Sync to Supabase immediately if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {
+                    // Save both categories and tasks to ensure full sync
+                    await window.userManager.saveCategories(this.data.categories);
                     await window.userManager.saveTodos(this.data.tasks);
                     window.syncManager.updateSyncStatus('synced');
+                    console.log('Task saved and synced to cloud');
                 }
             }
 
@@ -866,10 +869,13 @@
                 this.data.tasks = this.data.tasks.filter(t => t.id !== id);
                 await this.saveData();
                 
-                // Sync to Supabase if logged in
+                // Sync to Supabase immediately if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {
+                    // Save both categories and tasks to ensure full sync
+                    await window.userManager.saveCategories(this.data.categories);
                     await window.userManager.saveTodos(this.data.tasks);
                     window.syncManager.updateSyncStatus('synced');
+                    console.log('Task deleted and synced to cloud');
                 }
             }
 
