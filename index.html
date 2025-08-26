@@ -822,10 +822,14 @@
                 }
                 await this.saveData();
                 
+                // Mark local category update time
+                localStorage.setItem('lastLocalCategoryUpdate', new Date().getTime().toString());
+                
                 // Sync to Supabase if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {
                     await window.userManager.saveCategories(this.data.categories);
                     window.syncManager.updateSyncStatus('synced');
+                    console.log('Category saved and synced to cloud');
                 }
             }
 
@@ -850,6 +854,9 @@
                     this.data.tasks.push(task);
                 }
                 await this.saveData();
+                
+                // Mark local update time to prevent reload loop
+                localStorage.setItem('lastLocalUpdate', new Date().getTime().toString());
                 
                 // Sync to Supabase immediately if logged in
                 if (window.userManager && window.userManager.isLoggedIn()) {

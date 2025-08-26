@@ -440,7 +440,17 @@ class SyncManager {
     handleTodoUpdate(data) {
         if (!data || !data.data) return;
         
-        console.log('Received real-time todo update from cloud');
+        // Check if this update is from another device (not from us)
+        const lastLocalUpdate = localStorage.getItem('lastLocalUpdate');
+        const updateTime = new Date().getTime();
+        
+        // If we just updated locally (within 2 seconds), ignore this cloud update
+        if (lastLocalUpdate && (updateTime - parseInt(lastLocalUpdate)) < 2000) {
+            console.log('Ignoring cloud update - just updated locally');
+            return;
+        }
+        
+        console.log('Received real-time todo update from another device');
         
         // Update TodoMaster app data structure
         const localData = localStorage.getItem('todoMasterApp');
@@ -460,7 +470,17 @@ class SyncManager {
     handleCategoryUpdate(data) {
         if (!data || !data.data) return;
         
-        console.log('Received real-time category update from cloud');
+        // Check if this update is from another device
+        const lastLocalUpdate = localStorage.getItem('lastLocalCategoryUpdate');
+        const updateTime = new Date().getTime();
+        
+        // If we just updated locally (within 2 seconds), ignore this cloud update
+        if (lastLocalUpdate && (updateTime - parseInt(lastLocalUpdate)) < 2000) {
+            console.log('Ignoring category cloud update - just updated locally');
+            return;
+        }
+        
+        console.log('Received real-time category update from another device');
         
         // Update TodoMaster app data structure
         const localData = localStorage.getItem('todoMasterApp');
