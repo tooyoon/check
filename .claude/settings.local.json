@@ -33,7 +33,9 @@
       "WebFetch(domain:check-phi-six.vercel.app)",
       "Bash(del mindmap-improved.html)",
       "Bash(taskkill:*)",
-      "Bash(cmd /c:*)"
+      "Bash(cmd /c:*)",
+      "WebFetch(domain:checkcheck-plum.vercel.app)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": [],
