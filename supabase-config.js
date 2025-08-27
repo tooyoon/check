@@ -434,7 +434,6 @@ class SyncManager {
             
             // Update status to synced after everything is done
             this.updateSyncStatus('synced');
-            console.log('Sync status updated to synced');
             
         } catch (error) {
             console.error('Sync initialization failed:', error);
@@ -578,42 +577,43 @@ class SyncManager {
 
     updateSyncStatus(status) {
         this.syncStatus = status;
-        // Only log important status changes
-        if (status === 'offline' || status === 'error') {
-            console.log('Sync status:', status);
-        }
         
-        // Update UI indicator - try multiple times to ensure DOM is ready
-        const updateUI = () => {
-            const indicator = document.getElementById('sync-indicator');
-            if (indicator) {
-                // Remove all status classes first
-                indicator.className = 'sync-indicator';
-                // Add new status class
-                if (status === 'synced') {
-                    indicator.classList.add('synced');
-                } else if (status === 'syncing') {
-                    indicator.classList.add('syncing');
-                } else {
-                    indicator.classList.add('offline');
-                }
-                
-                const statusText = indicator.querySelector('.sync-text');
-                if (statusText) {
-                    statusText.textContent = status === 'synced' ? '동기화됨' : 
-                                            status === 'syncing' ? '동기화 중' : 
-                                            status === 'online' ? '온라인' : '오프라인';
-                }
-                indicator.title = `Last sync: ${this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never'}`;
-                console.log('Sync indicator updated successfully');
+        // Simply try to update the indicator if it exists, don't retry if not found
+        const indicator = document.getElementById('sync-indicator');
+        if (indicator) {
+            // Remove all status classes first
+            indicator.className = 'sync-indicator';
+            // Add new status class
+            if (status === 'synced') {
+                indicator.classList.add('synced');
+            } else if (status === 'syncing') {
+                indicator.classList.add('syncing');
             } else {
-                console.log('Sync indicator not found, retrying...');
-                // Retry after a short delay if element not found
-                setTimeout(updateUI, 500);
+                indicator.classList.add('offline');
             }
-        };
-        
-        updateUI();
+            
+            const statusText = indicator.querySelector('.sync-text');
+            if (statusText) {
+                statusText.textContent = status === 'synced' ? '동기화됨' : 
+                                        status === 'syncing' ? '동기화 중' : 
+                                        status === 'online' ? '온라인' : '오프라인';
+            }
+            
+            const statusDot = indicator.querySelector('.sync-dot');
+            if (statusDot) {
+                statusDot.className = 'sync-dot w-2 h-2 rounded-full';
+                if (status === 'synced') {
+                    statusDot.classList.add('bg-green-500');
+                } else if (status === 'syncing') {
+                    statusDot.classList.add('bg-yellow-500');
+                } else {
+                    statusDot.classList.add('bg-gray-400');
+                }
+            }
+            
+            indicator.title = `Last sync: ${this.lastSyncTime ? this.lastSyncTime.toLocaleTimeString() : 'Never'}`;
+        }
+        // If indicator doesn't exist, just ignore it - no retries, no console logs
     }
 
     mergeTodos(localTodos, cloudTodos) {

@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
     <title>TodoMaster - 스마트 체크리스트</title>
     <link rel="stylesheet" href="shared-design-system.css">
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -10,7 +13,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js"></script>
+    <script src="supabase-config.js?v=3.0"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
     
     <script>
@@ -440,35 +443,51 @@
             to { transform: translateY(0); opacity: 1; }
         }
 
-        .sync-indicator {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 8px 16px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            z-index: 100;
-            transition: all 0.3s ease;
+        #sync-indicator {
+            display: inline-flex !important;
+            position: static !important;
         }
-
+        
         .sync-indicator.syncing {
+            background: #fef3c7 !important;
+        }
+        
+        .sync-indicator.syncing .sync-dot {
             background: #fbbf24;
-            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .sync-indicator.syncing .sync-text {
+            color: #92400e;
         }
 
         .sync-indicator.synced {
+            background: #d1fae5 !important;
+        }
+        
+        .sync-indicator.synced .sync-dot {
             background: #10b981;
-            color: white;
+        }
+        
+        .sync-indicator.synced .sync-text {
+            color: #065f46;
         }
 
         .sync-indicator.offline {
+            background: #fee2e2 !important;
+        }
+        
+        .sync-indicator.offline .sync-dot {
             background: #ef4444;
-            color: white;
+        }
+        
+        .sync-indicator.offline .sync-text {
+            color: #991b1b;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .user-profile-button {
@@ -2601,9 +2620,13 @@
                                 <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                                     <span className="text-white text-lg font-bold">✓</span>
                                 </div>
-                                <div>
+                                <div className="flex-1">
                                     <h1 className="text-xl font-bold text-gray-800">TodoMaster</h1>
                                     <p className="text-xs text-gray-500">스마트 체크리스트</p>
+                                </div>
+                                <div id="sync-indicator" className="sync-indicator offline flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100" title="동기화 상태">
+                                    <span className="sync-dot w-2 h-2 rounded-full bg-gray-400"></span>
+                                    <span className="sync-text text-xs text-gray-600">오프라인</span>
                                 </div>
                             </div>
                             <div className="glassmorphism rounded-2xl p-4 mb-4 fade-in">
@@ -2782,52 +2805,51 @@
                                                 ? "category-active text-white shadow-lg" 
                                                 : "glassmorphism hover:shadow-md"
                                         )}
+                                        style={{ position: 'relative' }}
                                     >
                                         {editingCatId === c.id ? (
-                                            <div className="flex-1" style={{ position: 'relative' }}>
-                                                <div className="flex gap-1 items-center">
+                                            <>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                                                    className="text-lg w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded transition-colors"
+                                                >
+                                                    {editCatEmoji}
+                                                </button>
+                                                <input
+                                                    value={editCatName}
+                                                    onChange={(e) => {
+                                                        if (e.target.value.length <= 15) {
+                                                            setEditCatName(e.target.value);
+                                                        }
+                                                    }}
+                                                    placeholder="이름"
+                                                    className="flex-1 min-w-0 px-2 text-sm bg-transparent border-b-2 border-blue-400 focus:border-blue-600 outline-none text-gray-800"
+                                                    autoFocus
+                                                    onFocus={(e) => e.target.select()}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") { saveEditCategory(); setShowEditEmojiPicker(false); }
+                                                        if (e.key === "Escape") { cancelEditCategory(); setShowEditEmojiPicker(false); }
+                                                    }}
+                                                />
+                                                <div className="flex items-center gap-1">
                                                     <button
-                                                        type="button"
-                                                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
-                                                        className="w-7 h-7 border border-gray-200 rounded flex items-center justify-center text-xs hover:bg-gray-50 transition-colors flex-shrink-0"
+                                                        onClick={() => { saveEditCategory(); setShowEditEmojiPicker(false); }}
+                                                        className="w-7 h-7 flex items-center justify-center text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                                        title="저장"
                                                     >
-                                                        {editCatEmoji}
+                                                        <span className="text-lg font-bold">✓</span>
                                                     </button>
-                                                    <input
-                                                        value={editCatName}
-                                                        onChange={(e) => {
-                                                            if (e.target.value.length <= 15) {
-                                                                setEditCatName(e.target.value);
-                                                            }
-                                                        }}
-                                                        placeholder="이름"
-                                                        className="flex-1 min-w-0 h-7 px-2 text-xs border border-gray-200 rounded text-gray-800 bg-white"
-                                                        autoFocus
-                                                        onFocus={(e) => e.target.select()}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === "Enter") { saveEditCategory(); setShowEditEmojiPicker(false); }
-                                                            if (e.key === "Escape") { cancelEditCategory(); setShowEditEmojiPicker(false); }
-                                                        }}
-                                                    />
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <button
-                                                            onClick={() => { saveEditCategory(); setShowEditEmojiPicker(false); }}
-                                                            className="px-1 h-3 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 leading-none"
-                                                            style={{ fontSize: '10px' }}
-                                                        >
-                                                            ✓
-                                                        </button>
-                                                        <button
-                                                            onClick={() => { cancelEditCategory(); setShowEditEmojiPicker(false); }}
-                                                            className="px-1 h-3 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400 leading-none"
-                                                            style={{ fontSize: '10px' }}
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
+                                                    <button
+                                                        onClick={() => { cancelEditCategory(); setShowEditEmojiPicker(false); }}
+                                                        className="w-7 h-7 flex items-center justify-center text-gray-500 hover:bg-red-50 hover:text-red-600 rounded transition-colors"
+                                                        title="취소"
+                                                    >
+                                                        <span className="text-lg">✕</span>
+                                                    </button>
                                                 </div>
                                                 {showEditEmojiPicker && (
-                                                    <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ zIndex: 10000, maxWidth: '280px' }}>
+                                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white border-2 border-gray-300 rounded-lg p-2 shadow-xl" style={{ zIndex: 50000 }}>
                                                         <div className="grid grid-cols-8 gap-0.5 max-h-32" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
                                                             {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
                                                               "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
@@ -2844,7 +2866,7 @@
                                                                         setEditCatEmoji(emoji);
                                                                         setShowEditEmojiPicker(false);
                                                                     }}
-                                                                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-xs transition-colors"
+                                                                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-sm transition-colors"
                                                                 >
                                                                     {emoji}
                                                                 </button>
@@ -2852,7 +2874,7 @@
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
+                                            </>
                                         ) : (
                                             <>
                                                 <span 

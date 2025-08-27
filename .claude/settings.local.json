@@ -23,7 +23,10 @@
       "Bash(git branch:*)",
       "Bash(git checkout:*)",
       "WebFetch(domain:supabase.com)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(copy supabase-config.js supabase-config-v2.js)",
+      "Bash(cmd /c copy:*)",
+      "Bash(del \"C:\\Users\\sogoy\\Desktop\\check\\supabase-config-new.js\")"
     ],
     "deny": [],
     "ask": [],
