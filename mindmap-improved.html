@@ -512,10 +512,21 @@
             const nodeRef = useRef(null);
             const isDragging = useRef(false);
             const dragStart = useRef({ x: 0, y: 0 });
+            const isComposing = useRef(false);
+            
+            // Update text when node prop changes
+            useEffect(() => {
+                setText(node.text);
+            }, [node.text]);
             
             const handleMouseDown = (e) => {
                 if (e.target.classList.contains('connection-point') || 
                     e.target.classList.contains('node-action')) {
+                    return;
+                }
+                
+                // Don't start dragging if clicking on textarea
+                if (e.target.tagName === 'TEXTAREA') {
                     return;
                 }
                 
@@ -559,6 +570,24 @@
                 return 'node';
             };
             
+            // Handle text input with proper Korean IME support
+            const handleTextChange = (e) => {
+                setText(e.target.value);
+                // Save immediately during typing for better UX
+                if (!isComposing.current) {
+                    onEdit(node.id, e.target.value);
+                }
+            };
+            
+            const handleCompositionStart = () => {
+                isComposing.current = true;
+            };
+            
+            const handleCompositionEnd = (e) => {
+                isComposing.current = false;
+                onEdit(node.id, e.target.value);
+            };
+            
             return (
                 <div 
                     ref={nodeRef}
@@ -575,8 +604,15 @@
                         <textarea
                             className="node-text"
                             value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            onBlur={() => onEdit(node.id, text)}
+                            onChange={handleTextChange}
+                            onCompositionStart={handleCompositionStart}
+                            onCompositionEnd={handleCompositionEnd}
+                            onBlur={() => {
+                                if (!isComposing.current) {
+                                    onEdit(node.id, text);
+                                }
+                                setIsEditing(false);
+                            }}
                             onFocus={() => setIsEditing(true)}
                             placeholder="Enter text..."
                             rows={1}
