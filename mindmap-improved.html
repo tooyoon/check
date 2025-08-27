@@ -573,19 +573,29 @@
             // Handle text input with proper Korean IME support
             const handleTextChange = (e) => {
                 setText(e.target.value);
-                // Save immediately during typing for better UX
-                if (!isComposing.current) {
-                    onEdit(node.id, e.target.value);
-                }
+                // Don't save immediately - wait for blur to avoid re-render issues
             };
             
             const handleCompositionStart = () => {
                 isComposing.current = true;
             };
             
-            const handleCompositionEnd = (e) => {
+            const handleCompositionEnd = () => {
                 isComposing.current = false;
-                onEdit(node.id, e.target.value);
+            };
+            
+            const handleBlur = () => {
+                // Save on blur
+                onEdit(node.id, text);
+                setIsEditing(false);
+            };
+            
+            const handleKeyDown = (e) => {
+                // Save on Enter key
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    e.target.blur();
+                }
             };
             
             return (
@@ -607,12 +617,8 @@
                             onChange={handleTextChange}
                             onCompositionStart={handleCompositionStart}
                             onCompositionEnd={handleCompositionEnd}
-                            onBlur={() => {
-                                if (!isComposing.current) {
-                                    onEdit(node.id, text);
-                                }
-                                setIsEditing(false);
-                            }}
+                            onBlur={handleBlur}
+                            onKeyDown={handleKeyDown}
                             onFocus={() => setIsEditing(true)}
                             placeholder="Enter text..."
                             rows={1}
@@ -646,10 +652,29 @@
         
         // Main MindMap Component
         function MindMapApp() {
-            const [nodes, setNodes] = useState([
-                { id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }
-            ]);
-            const [connections, setConnections] = useState([]);
+            // Load saved data from localStorage
+            const loadSavedData = () => {
+                const saved = localStorage.getItem('mindmap-data');
+                if (saved) {
+                    try {
+                        const data = JSON.parse(saved);
+                        return {
+                            nodes: data.nodes || [{ id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }],
+                            connections: data.connections || []
+                        };
+                    } catch (e) {
+                        console.error('Failed to load saved mindmap:', e);
+                    }
+                }
+                return {
+                    nodes: [{ id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }],
+                    connections: []
+                };
+            };
+            
+            const initialData = loadSavedData();
+            const [nodes, setNodes] = useState(initialData.nodes);
+            const [connections, setConnections] = useState(initialData.connections);
             const [selectedNodeId, setSelectedNodeId] = useState(null);
             const [zoom, setZoom] = useState(1);
             const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -731,6 +756,69 @@
                 };
             };
             
+            // Auto arrange nodes
+            const autoArrangeNodes = (nodes, connections, root) => {
+                const arranged = [...nodes];
+                const visited = new Set();
+                const levels = {};
+                
+                // BFS to determine levels
+                const queue = [{ node: root, level: 0 }];
+                visited.add(root.id);
+                levels[root.id] = 0;
+                
+                while (queue.length > 0) {
+                    const { node, level } = queue.shift();
+                    
+                    // Find children
+                    const childConnections = connections.filter(c => c.from === node.id);
+                    childConnections.forEach(conn => {
+                        if (!visited.has(conn.to)) {
+                            visited.add(conn.to);
+                            const childNode = nodes.find(n => n.id === conn.to);
+                            if (childNode) {
+                                levels[conn.to] = level + 1;
+                                queue.push({ node: childNode, level: level + 1 });
+                            }
+                        }
+                    });
+                }
+                
+                // Group nodes by level
+                const levelGroups = {};
+                arranged.forEach(node => {
+                    const level = levels[node.id] || 0;
+                    if (!levelGroups[level]) levelGroups[level] = [];
+                    levelGroups[level].push(node);
+                });
+                
+                // Arrange nodes
+                const centerX = window.innerWidth / 2 - 320; // Account for sidebar
+                const centerY = window.innerHeight / 2;
+                const horizontalSpacing = 200;
+                const verticalSpacing = 120;
+                
+                Object.keys(levelGroups).forEach(level => {
+                    const nodesAtLevel = levelGroups[level];
+                    const totalWidth = (nodesAtLevel.length - 1) * horizontalSpacing;
+                    const startX = centerX + parseInt(level) * horizontalSpacing * 1.5 - totalWidth / 2;
+                    
+                    nodesAtLevel.forEach((node, index) => {
+                        const nodeIndex = arranged.findIndex(n => n.id === node.id);
+                        if (nodeIndex !== -1) {
+                            arranged[nodeIndex] = {
+                                ...arranged[nodeIndex],
+                                x: level == 0 ? centerX : startX + index * horizontalSpacing,
+                                y: level == 0 ? centerY : centerY + (index - nodesAtLevel.length / 2) * verticalSpacing,
+                                level: parseInt(level)
+                            };
+                        }
+                    });
+                });
+                
+                return arranged;
+            };
+            
             // Handle canvas panning
             const handleCanvasMouseDown = (e) => {
                 if (e.target === canvasRef.current) {
@@ -769,6 +857,20 @@
                 };
             }, [pan]);
             
+            // Auto-save to localStorage
+            useEffect(() => {
+                const saveTimer = setTimeout(() => {
+                    const mindmapData = {
+                        nodes: nodes,
+                        connections: connections,
+                        savedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
+                }, 1000); // Save after 1 second of inactivity
+                
+                return () => clearTimeout(saveTimer);
+            }, [nodes, connections]);
+            
             // Keyboard shortcuts
             useEffect(() => {
                 const handleKeyDown = (e) => {
@@ -787,11 +889,22 @@
                         e.preventDefault();
                         setZoom(prev => Math.max(prev - 0.1, 0.5));
                     }
+                    if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        // Manual save
+                        const mindmapData = {
+                            nodes: nodes,
+                            connections: connections,
+                            savedAt: new Date().toISOString()
+                        };
+                        localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
+                        setSaveStatus('saved');
+                    }
                 };
                 
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
-            }, [selectedNodeId]);
+            }, [selectedNodeId, nodes, connections]);
             
             return (
                 <>
@@ -895,19 +1008,58 @@
                         
                         {/* Toolbar */}
                         <div className="toolbar">
-                            <button className="btn-icon" onClick={() => addNode()} title="Add Node">
-                                ➕
+                            <button className="btn-icon" onClick={() => addNode()} title="Add Node" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>➕</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>추가</span>
                             </button>
-                            <button className="btn-icon" onClick={() => setZoom(1)} title="Reset View">
-                                🎯
+                            <button className="btn-icon" onClick={() => {
+                                // Center all nodes
+                                const avgX = nodes.reduce((sum, n) => sum + n.x, 0) / nodes.length;
+                                const avgY = nodes.reduce((sum, n) => sum + n.y, 0) / nodes.length;
+                                const centerX = window.innerWidth / 2;
+                                const centerY = window.innerHeight / 2;
+                                setPan({ x: centerX - avgX, y: centerY - avgY });
+                                setZoom(1);
+                            }} title="Center View" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>🎯</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>중앙</span>
+                            </button>
+                            <button className="btn-icon" onClick={() => {
+                                // Auto arrange nodes
+                                const root = nodes.find(n => n.id === 'root');
+                                if (root) {
+                                    const arranged = autoArrangeNodes(nodes, connections, root);
+                                    setNodes(arranged);
+                                }
+                            }} title="Auto Arrange" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>📐</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>정렬</span>
+                            </button>
+                            <button className="btn-icon" onClick={() => {
+                                // Save to localStorage
+                                const mindmapData = {
+                                    nodes: nodes,
+                                    connections: connections,
+                                    savedAt: new Date().toISOString()
+                                };
+                                localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
+                                setSaveStatus('saved');
+                                setTimeout(() => setSaveStatus('saved'), 2000);
+                            }} title="Save" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>💾</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>저장</span>
                             </button>
                             <div className="toolbar-separator" />
-                            <button className="btn-icon" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} title="Zoom Out">
-                                ➖
+                            <button className="btn-icon" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} title="Zoom Out" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>➖</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>축소</span>
                             </button>
-                            <span className="text-sm text-muted px-2">{Math.round(zoom * 100)}%</span>
-                            <button className="btn-icon" onClick={() => setZoom(z => Math.min(z + 0.1, 2))} title="Zoom In">
-                                ➕
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '4px' }}>
+                                <span className="text-sm text-muted">{Math.round(zoom * 100)}%</span>
+                            </div>
+                            <button className="btn-icon" onClick={() => setZoom(z => Math.min(z + 0.1, 2))} title="Zoom In" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
+                                <span style={{ fontSize: '20px' }}>➕</span>
+                                <span style={{ fontSize: '10px', marginTop: '2px' }}>확대</span>
                             </button>
                         </div>
                         
