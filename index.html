@@ -2451,6 +2451,67 @@
                             </div>
                         </div>
 
+                        {/* 새 카테고리 추가 - 맨 위로 이동 */}
+                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50">
+                            <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
+                                <span className="text-sm">➕</span>
+                                <span>새 카테고리</span>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex gap-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                                        className="w-8 h-7 border border-gray-200 rounded flex items-center justify-center text-sm hover:bg-gray-50 transition-colors"
+                                        title="이모지"
+                                    >
+                                        {selectedEmoji}
+                                    </button>
+                                    <input
+                                        value={newCatName}
+                                        onChange={(e) => setNewCatName(e.target.value)}
+                                        onKeyDown={(e) => e.key === "Enter" && addCategory()}
+                                        placeholder="이름..."
+                                        className="flex-1 min-w-0 px-2 py-1 h-7 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400"
+                                    />
+                                    <button
+                                        onClick={addCategory}
+                                        disabled={!newCatName.trim()}
+                                        className="px-3 h-7 text-xs rounded bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-sm font-medium"
+                                    >
+                                        추가
+                                    </button>
+                                </div>
+                                
+                                {showEmojiPicker && (
+                                    <div className="bg-white border border-gray-200 rounded-lg p-2 shadow-lg">
+                                        <div className="grid grid-cols-8 gap-0.5 max-h-32 overflow-y-auto">
+                                            {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
+                                              "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
+                                              "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
+                                              "🔮", "💎", "🎯", "🎨", "🎭", "🎪", "🎲", "🎮",
+                                              "⭐", "🌟", "💫", "✨", "🔥", "💥", "⚡", "🌈",
+                                              "🏠", "🏢", "🏆", "🎁", "🎉", "🎊", "💼", "💰",
+                                              "🔧", "🔨", "⚙️", "🧰", "🔬", "🔭", "💻", "🖥️",
+                                              "🌸", "🌺", "🌻", "🌹", "🌷", "🌱", "🌳", "🍀"].map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedEmoji(emoji);
+                                                        setShowEmojiPicker(false);
+                                                    }}
+                                                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-sm transition-colors"
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         <div className="mb-6">
                             <div className="text-sm font-semibold mb-3 text-gray-700">📂 카테고리</div>
                             <div className="space-y-2">
@@ -2552,68 +2613,6 @@
                                         )}
                                     </div>
                                 ))}
-                            </div>
-                            
-                            <div className="mt-6 bg-white/60 backdrop-blur-sm rounded-2xl p-3 border border-gray-200/50">
-                                <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-2">
-                                    <span className="text-sm">➕</span>
-                                    <span>새 카테고리</span>
-                                </div>
-                                <div className="space-y-3">
-                                    <div className="flex gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                            className="w-10 h-9 border border-gray-200 rounded-lg flex items-center justify-center text-lg hover:bg-gray-50 transition-colors"
-                                            title="이모지 선택"
-                                        >
-                                            {selectedEmoji}
-                                        </button>
-                                        <input
-                                            value={newCatName}
-                                            onChange={(e) => setNewCatName(e.target.value)}
-                                            onKeyDown={(e) => e.key === "Enter" && addCategory()}
-                                            placeholder="이름 입력..."
-                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400"
-                                        />
-                                    </div>
-                                    
-                                    {showEmojiPicker && (
-                                        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-lg">
-                                            <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
-                                                {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
-                                                  "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
-                                                  "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
-                                                  "🔮", "💎", "🎯", "🎨", "🎭", "🎪", "🎲", "🎮",
-                                                  "⭐", "🌟", "💫", "✨", "🔥", "💥", "⚡", "🌈",
-                                                  "🏠", "🏢", "🏆", "🎁", "🎉", "🎊", "💼", "💰",
-                                                  "🔧", "🔨", "⚙️", "🧰", "🔬", "🔭", "💻", "🖥️",
-                                                  "🌸", "🌺", "🌻", "🌹", "🌷", "🌱", "🌳", "🍀"].map(emoji => (
-                                                    <button
-                                                        key={emoji}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedEmoji(emoji);
-                                                            setShowEmojiPicker(false);
-                                                        }}
-                                                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-lg text-xl transition-colors"
-                                                    >
-                                                        {emoji}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                    
-                                    <button
-                                        onClick={addCategory}
-                                        disabled={!newCatName.trim()}
-                                        className="w-full px-3 py-2 text-sm rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-1"
-                                    >
-                                        <span>✨</span>
-                                        <span>추가</span>
-                                    </button>
-                                </div>
                             </div>
                         </div>
 
@@ -2800,7 +2799,7 @@
                                         
                                         {/* Search Results Dropdown */}
                                         {showSearchResults && debouncedQuery && (
-                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl" style={{ zIndex: 1000 }}>
                                                 {(() => {
                                                     const searchResults = tasks.filter(t => 
                                                         t.title.toLowerCase().includes(debouncedQuery.toLowerCase()) || 
