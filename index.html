@@ -2458,7 +2458,7 @@
                         </div>
 
                         {/* 검색창 - 사이드바 */}
-                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50" style={{ position: 'relative', zIndex: showSearchResults ? 1000 : 1 }}>
+                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50" style={{ position: 'relative', zIndex: showSearchResults && debouncedQuery ? 2000 : 2 }}>
                             <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
                                 <span className="text-sm">🔍</span>
                                 <span>작업 검색</span>
@@ -2478,10 +2478,11 @@
                                     className="absolute left-0 right-0 mt-1 bg-white border-2 border-blue-300 rounded-xl shadow-2xl"
                                     style={{ 
                                         top: '100%',
-                                        zIndex: 9999,
+                                        zIndex: 99999,
                                         maxHeight: '300px',
                                         overflowY: 'auto',
-                                        overflowX: 'hidden'
+                                        overflowX: 'hidden',
+                                        position: 'absolute'
                                     }}>
                                     {(() => {
                                         const searchResults = tasks.filter(t => 
@@ -2529,7 +2530,7 @@
                         </div>
 
                         {/* 새 카테고리 추가 - 맨 위로 이동 */}
-                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50">
+                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50" style={{ position: 'relative', zIndex: 1 }}>
                             <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
                                 <span className="text-sm">➕</span>
                                 <span>새 카테고리</span>
@@ -2561,7 +2562,7 @@
                                 </div>
                                 
                                 {showEmojiPicker && (
-                                    <div className="bg-white border border-gray-200 rounded-lg p-2 shadow-lg">
+                                    <div className="bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ position: 'relative', zIndex: 10 }}>
                                         <div className="grid grid-cols-8 gap-0.5 max-h-32 overflow-y-auto">
                                             {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
                                               "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
