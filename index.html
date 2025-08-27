@@ -1709,6 +1709,8 @@
             const [quickTaskText, setQuickTaskText] = useState("");
             const [showSearchResults, setShowSearchResults] = useState(false);
             const [highlightedTaskId, setHighlightedTaskId] = useState(null);
+            const [showAddCategory, setShowAddCategory] = useState(false);
+            const [showSearch, setShowSearch] = useState(false);
             const fileInputRef = useRef(null);
             const textFileInputRef = useRef(null);
 
@@ -2447,16 +2449,40 @@
                             </div>
                         </div>
 
-                        {/* 검색창 - 사이드바 */}
-                        <div className="mb-3" style={{ position: 'relative', zIndex: showSearchResults && debouncedQuery ? 2000 : 2 }}>
-                            <input
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                onFocus={() => setShowSearchResults(true)}
-                                onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
-                                placeholder="검색어 입력..."
-                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/90 text-gray-800 placeholder-gray-500 hover:bg-white transition-colors"
-                            />
+                        {/* 카테고리 관리 섹션 */}
+                        <div className="mb-6">
+                            <div className="text-sm font-semibold mb-3 text-gray-700 flex items-center justify-between">
+                                <span>📂 카테고리</span>
+                                <div className="flex gap-1">
+                                    <button
+                                        onClick={() => setShowSearch(!showSearch)}
+                                        className={cn("p-1.5 rounded hover:bg-gray-100 transition-colors", showSearch && "bg-gray-100")}
+                                        title="검색"
+                                    >
+                                        🔍
+                                    </button>
+                                    <button
+                                        onClick={() => setShowAddCategory(!showAddCategory)}
+                                        className={cn("p-1.5 rounded hover:bg-gray-100 transition-colors", showAddCategory && "bg-gray-100")}
+                                        title="추가"
+                                    >
+                                        ➕
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* 검색창 */}
+                            {showSearch && (
+                                <div className="mb-3" style={{ position: 'relative', zIndex: showSearchResults && debouncedQuery ? 2000 : 2 }}>
+                                    <input
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        onFocus={() => setShowSearchResults(true)}
+                                        onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
+                                        placeholder="검색어 입력..."
+                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500"
+                                        autoFocus
+                                    />
                             
                             {/* Search Results Dropdown */}
                             {showSearchResults && debouncedQuery && debouncedQuery.length > 0 && (
@@ -2511,13 +2537,14 @@
                                             </>
                                         );
                                     })()}
-                                </div>
+                                    </div>
+                                )}
+                            </div>
                             )}
-                        </div>
-
-                        {/* 새 카테고리 추가 - 맨 위로 이동 */}
-                        <div className="mb-4" style={{ position: 'relative', zIndex: 1 }}>
-                            <div className="space-y-2">
+                            
+                            {/* 새 카테고리 추가 */}
+                            {showAddCategory && (
+                                <div className="mb-3 p-2 bg-gray-50 rounded-lg" style={{ position: 'relative', zIndex: 1 }}>
                                 <div className="flex gap-1">
                                     <button
                                         type="button"
@@ -2572,8 +2599,6 @@
                             </div>
                         </div>
 
-                        <div className="mb-6">
-                            <div className="text-sm font-semibold mb-3 text-gray-700">📂 카테고리</div>
                             <div className="space-y-2">
                                 {categories.map((c) => (
                                     <div
@@ -2625,7 +2650,7 @@
                                                     </button>
                                                 </div>
                                                 {showEditEmojiPicker && (
-                                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ zIndex: 100 }}>
+                                                    <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ zIndex: 10000 }}>
                                                         <div className="grid grid-cols-8 gap-0.5 max-h-32" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
                                                             {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
                                                               "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
