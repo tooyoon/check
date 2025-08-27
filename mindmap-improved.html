@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindFlow Pro - Advanced Mind Mapping</title>
+    <link rel="stylesheet" href="shared-design-system.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    
+    <style>
+        /* MindMap Specific Styles */
+        #app {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+        
+        /* Modern Sidebar */
+        .sidebar {
+            width: 320px;
+            background: var(--bg-card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: transform var(--transition-base);
+            z-index: 10;
+        }
+        
+        .sidebar.collapsed {
+            transform: translateX(-100%);
+        }
+        
+        .sidebar-header {
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--border);
+            background: var(--bg-primary);
+        }
+        
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+        }
+        
+        /* Canvas Container */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: var(--bg-primary);
+            background-image: 
+                radial-gradient(circle, rgba(139, 92, 246, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        
+        #canvas.panning {
+            cursor: grabbing;
+        }
+        
+        /* Toolbar */
+        .toolbar {
+            position: absolute;
+            top: var(--spacing-lg);
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-sm);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            gap: var(--spacing-xs);
+            z-index: 20;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        
+        .toolbar-separator {
+            width: 1px;
+            background: var(--border);
+            margin: 0 var(--spacing-xs);
+        }
+        
+        /* Modern Node Styles */
+        .node {
+            position: absolute;
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-md) var(--spacing-lg);
+            box-shadow: var(--shadow-md);
+            cursor: move;
+            transition: all var(--transition-base);
+            border: 2px solid transparent;
+            min-width: 140px;
+            max-width: 300px;
+            user-select: none;
+        }
+        
+        .node:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .node.selected {
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), var(--shadow-lg);
+        }
+        
+        .node.root {
+            background: var(--primary-gradient);
+            color: white;
+            font-weight: 600;
+            font-size: 1.125rem;
+            min-width: 180px;
+        }
+        
+        .node.child-1 {
+            background: linear-gradient(135deg, var(--secondary-green) 0%, var(--secondary-teal) 100%);
+            color: white;
+            font-weight: 500;
+        }
+        
+        .node.child-2 {
+            background: linear-gradient(135deg, var(--secondary-orange) 0%, var(--secondary-amber) 100%);
+            color: white;
+        }
+        
+        /* Node Content */
+        .node-content {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+        
+        .node-icon {
+            font-size: 1.25rem;
+            opacity: 0.9;
+        }
+        
+        .node-text {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: inherit;
+            font-weight: inherit;
+            outline: none;
+            resize: none;
+            overflow: hidden;
+            min-height: 1.5em;
+            line-height: 1.5;
+        }
+        
+        /* Node Actions */
+        .node-actions {
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            display: none;
+            gap: var(--spacing-xs);
+            flex-direction: row;
+        }
+        
+        .node:hover .node-actions {
+            display: flex;
+        }
+        
+        .node-action {
+            width: 28px;
+            height: 28px;
+            border-radius: var(--radius-full);
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-size: 0.75rem;
+        }
+        
+        .node-action:hover {
+            transform: scale(1.1);
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+        
+        .node-action.delete:hover {
+            background: var(--danger);
+            border-color: var(--danger);
+        }
+        
+        /* Connection Points */
+        .connection-point {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: var(--primary-blue);
+            border: 3px solid white;
+            border-radius: var(--radius-full);
+            cursor: crosshair;
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            z-index: 5;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .node:hover .connection-point {
+            opacity: 1;
+        }
+        
+        .connection-point:hover {
+            transform: scale(1.2);
+            background: var(--primary-purple);
+        }
+        
+        .connection-point.top { top: -8px; left: 50%; transform: translateX(-50%); }
+        .connection-point.right { right: -8px; top: 50%; transform: translateY(-50%); }
+        .connection-point.bottom { bottom: -8px; left: 50%; transform: translateX(-50%); }
+        .connection-point.left { left: -8px; top: 50%; transform: translateY(-50%); }
+        
+        /* SVG Connection Lines */
+        .connection-svg {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .connection-path {
+            fill: none;
+            stroke: var(--primary-blue);
+            stroke-width: 2;
+            stroke-linecap: round;
+            opacity: 0.6;
+            transition: all var(--transition-fast);
+        }
+        
+        .connection-path:hover {
+            stroke-width: 3;
+            opacity: 1;
+            filter: drop-shadow(0 2px 4px rgba(59, 130, 246, 0.3));
+        }
+        
+        /* Context Menu */
+        .context-menu {
+            position: absolute;
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-xl);
+            padding: var(--spacing-xs);
+            min-width: 200px;
+            z-index: 100;
+            display: none;
+        }
+        
+        .context-menu.show {
+            display: block;
+            animation: slideUp var(--transition-fast);
+        }
+        
+        .context-menu-item {
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            transition: background var(--transition-fast);
+        }
+        
+        .context-menu-item:hover {
+            background: var(--bg-primary);
+        }
+        
+        /* Mini Map */
+        .minimap {
+            position: absolute;
+            bottom: var(--spacing-lg);
+            right: var(--spacing-lg);
+            width: 200px;
+            height: 150px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            opacity: 0.9;
+            overflow: hidden;
+            z-index: 15;
+        }
+        
+        .minimap-viewport {
+            position: absolute;
+            border: 2px solid var(--primary-blue);
+            background: rgba(59, 130, 246, 0.1);
+            cursor: move;
+        }
+        
+        /* Zoom Controls */
+        .zoom-controls {
+            position: absolute;
+            bottom: var(--spacing-lg);
+            left: var(--spacing-lg);
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-xs);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-xs);
+            z-index: 20;
+        }
+        
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .zoom-btn:hover {
+            background: var(--primary-blue);
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .zoom-level {
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding: var(--spacing-xs);
+        }
+        
+        /* Color Picker Palette */
+        .color-palette {
+            position: absolute;
+            background: var(--bg-card);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            box-shadow: var(--shadow-xl);
+            display: none;
+            grid-template-columns: repeat(5, 1fr);
+            gap: var(--spacing-xs);
+            z-index: 30;
+        }
+        
+        .color-palette.show {
+            display: grid;
+        }
+        
+        .color-option {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: transform var(--transition-fast);
+            border: 2px solid transparent;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.1);
+            border-color: var(--border);
+        }
+        
+        /* Save Indicator */
+        .save-indicator {
+            position: absolute;
+            top: var(--spacing-lg);
+            right: var(--spacing-lg);
+            padding: var(--spacing-sm) var(--spacing-md);
+            background: var(--bg-card);
+            border-radius: var(--radius-full);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            font-size: 0.875rem;
+            transition: all var(--transition-base);
+            z-index: 20;
+        }
+        
+        .save-indicator.saving {
+            background: var(--warning);
+            color: white;
+        }
+        
+        .save-indicator.saved {
+            background: var(--success);
+            color: white;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                width: 85vw;
+                max-width: 320px;
+                height: 100%;
+                z-index: 30;
+            }
+            
+            .toolbar {
+                flex-wrap: wrap;
+                max-width: 90vw;
+            }
+            
+            .minimap {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        
+        // Constants
+        const NODE_COLORS = [
+            '#3b82f6', '#8b5cf6', '#ec4899', '#f43f5e', 
+            '#f97316', '#fbbf24', '#84cc16', '#10b981',
+            '#14b8a6', '#06b6d4', '#0ea5e9', '#6366f1'
+        ];
+        
+        const NODE_ICONS = ['💡', '🎯', '🚀', '💎', '🌟', '🔥', '💪', '🎨'];
+        
+        // Helper function for smooth Bezier curves
+        function calculateBezierPath(startX, startY, endX, endY) {
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Control point offset based on distance
+            const offset = Math.min(distance * 0.4, 100);
+            
+            // Calculate control points for smooth curve
+            let cp1x, cp1y, cp2x, cp2y;
+            
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal connection
+                cp1x = startX + offset;
+                cp1y = startY;
+                cp2x = endX - offset;
+                cp2y = endY;
+            } else {
+                // Vertical connection
+                cp1x = startX;
+                cp1y = startY + offset;
+                cp2x = endX;
+                cp2y = endY - offset;
+            }
+            
+            return `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${endX} ${endY}`;
+        }
+        
+        // Connection Component
+        function Connection({ start, end, selected = false }) {
+            const path = calculateBezierPath(start.x, start.y, end.x, end.y);
+            
+            return (
+                <svg 
+                    className="connection-svg" 
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        pointerEvents: 'none'
+                    }}
+                >
+                    <defs>
+                        <linearGradient id="connection-gradient">
+                            <stop offset="0%" stopColor="var(--primary-blue)" />
+                            <stop offset="100%" stopColor="var(--primary-purple)" />
+                        </linearGradient>
+                    </defs>
+                    <path 
+                        d={path}
+                        className="connection-path"
+                        style={{
+                            stroke: selected ? 'url(#connection-gradient)' : 'var(--primary-blue)',
+                            strokeWidth: selected ? 3 : 2,
+                            opacity: selected ? 1 : 0.6
+                        }}
+                    />
+                </svg>
+            );
+        }
+        
+        // Node Component
+        function Node({ node, isSelected, onSelect, onEdit, onDelete, onConnect, onUpdatePosition }) {
+            const [isEditing, setIsEditing] = useState(false);
+            const [text, setText] = useState(node.text);
+            const nodeRef = useRef(null);
+            const isDragging = useRef(false);
+            const dragStart = useRef({ x: 0, y: 0 });
+            
+            const handleMouseDown = (e) => {
+                if (e.target.classList.contains('connection-point') || 
+                    e.target.classList.contains('node-action')) {
+                    return;
+                }
+                
+                isDragging.current = true;
+                dragStart.current = {
+                    x: e.clientX - node.x,
+                    y: e.clientY - node.y
+                };
+                
+                onSelect(node.id);
+                e.preventDefault();
+            };
+            
+            const handleMouseMove = (e) => {
+                if (!isDragging.current) return;
+                
+                const newX = e.clientX - dragStart.current.x;
+                const newY = e.clientY - dragStart.current.y;
+                
+                onUpdatePosition(node.id, newX, newY);
+            };
+            
+            const handleMouseUp = () => {
+                isDragging.current = false;
+            };
+            
+            useEffect(() => {
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                };
+            }, [node.x, node.y]);
+            
+            const getNodeClass = () => {
+                if (node.level === 0) return 'node root';
+                if (node.level === 1) return 'node child-1';
+                if (node.level === 2) return 'node child-2';
+                return 'node';
+            };
+            
+            return (
+                <div 
+                    ref={nodeRef}
+                    className={`${getNodeClass()} ${isSelected ? 'selected' : ''}`}
+                    style={{
+                        left: `${node.x}px`,
+                        top: `${node.y}px`,
+                        backgroundColor: node.color || undefined
+                    }}
+                    onMouseDown={handleMouseDown}
+                >
+                    <div className="node-content">
+                        <span className="node-icon">{node.icon || '💡'}</span>
+                        <textarea
+                            className="node-text"
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            onBlur={() => onEdit(node.id, text)}
+                            onFocus={() => setIsEditing(true)}
+                            placeholder="Enter text..."
+                            rows={1}
+                        />
+                    </div>
+                    
+                    <div className="node-actions">
+                        <button 
+                            className="node-action"
+                            onClick={() => onConnect(node.id)}
+                            title="Add connection"
+                        >
+                            🔗
+                        </button>
+                        <button 
+                            className="node-action delete"
+                            onClick={() => onDelete(node.id)}
+                            title="Delete node"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    
+                    <div className="connection-point top" data-position="top" />
+                    <div className="connection-point right" data-position="right" />
+                    <div className="connection-point bottom" data-position="bottom" />
+                    <div className="connection-point left" data-position="left" />
+                </div>
+            );
+        }
+        
+        // Main MindMap Component
+        function MindMapApp() {
+            const [nodes, setNodes] = useState([
+                { id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }
+            ]);
+            const [connections, setConnections] = useState([]);
+            const [selectedNodeId, setSelectedNodeId] = useState(null);
+            const [zoom, setZoom] = useState(1);
+            const [pan, setPan] = useState({ x: 0, y: 0 });
+            const [saveStatus, setSaveStatus] = useState('saved');
+            const canvasRef = useRef(null);
+            const isPanning = useRef(false);
+            const panStart = useRef({ x: 0, y: 0 });
+            
+            // Add new node
+            const addNode = useCallback((parentId = null) => {
+                const parent = parentId ? nodes.find(n => n.id === parentId) : null;
+                const newNode = {
+                    id: `node-${Date.now()}`,
+                    text: 'New Idea',
+                    x: parent ? parent.x + 150 : 300,
+                    y: parent ? parent.y + 50 : 200,
+                    level: parent ? parent.level + 1 : 0,
+                    icon: NODE_ICONS[Math.floor(Math.random() * NODE_ICONS.length)]
+                };
+                
+                setNodes(prev => [...prev, newNode]);
+                
+                if (parent) {
+                    setConnections(prev => [...prev, {
+                        id: `conn-${Date.now()}`,
+                        from: parentId,
+                        to: newNode.id
+                    }]);
+                }
+                
+                setSaveStatus('saving');
+                setTimeout(() => setSaveStatus('saved'), 1000);
+            }, [nodes]);
+            
+            // Delete node
+            const deleteNode = useCallback((nodeId) => {
+                if (nodeId === 'root') return;
+                
+                setNodes(prev => prev.filter(n => n.id !== nodeId));
+                setConnections(prev => prev.filter(c => c.from !== nodeId && c.to !== nodeId));
+                
+                setSaveStatus('saving');
+                setTimeout(() => setSaveStatus('saved'), 1000);
+            }, []);
+            
+            // Update node position
+            const updateNodePosition = useCallback((nodeId, x, y) => {
+                setNodes(prev => prev.map(n => 
+                    n.id === nodeId ? { ...n, x, y } : n
+                ));
+            }, []);
+            
+            // Edit node text
+            const editNodeText = useCallback((nodeId, text) => {
+                setNodes(prev => prev.map(n => 
+                    n.id === nodeId ? { ...n, text } : n
+                ));
+                
+                setSaveStatus('saving');
+                setTimeout(() => setSaveStatus('saved'), 1000);
+            }, []);
+            
+            // Calculate connection endpoints
+            const getConnectionEndpoints = (connection) => {
+                const fromNode = nodes.find(n => n.id === connection.from);
+                const toNode = nodes.find(n => n.id === connection.to);
+                
+                if (!fromNode || !toNode) return null;
+                
+                return {
+                    start: {
+                        x: fromNode.x + 70,
+                        y: fromNode.y + 25
+                    },
+                    end: {
+                        x: toNode.x + 70,
+                        y: toNode.y + 25
+                    }
+                };
+            };
+            
+            // Handle canvas panning
+            const handleCanvasMouseDown = (e) => {
+                if (e.target === canvasRef.current) {
+                    isPanning.current = true;
+                    panStart.current = {
+                        x: e.clientX - pan.x,
+                        y: e.clientY - pan.y
+                    };
+                    canvasRef.current.classList.add('panning');
+                }
+            };
+            
+            const handleCanvasMouseMove = (e) => {
+                if (!isPanning.current) return;
+                
+                setPan({
+                    x: e.clientX - panStart.current.x,
+                    y: e.clientY - panStart.current.y
+                });
+            };
+            
+            const handleCanvasMouseUp = () => {
+                isPanning.current = false;
+                if (canvasRef.current) {
+                    canvasRef.current.classList.remove('panning');
+                }
+            };
+            
+            useEffect(() => {
+                document.addEventListener('mousemove', handleCanvasMouseMove);
+                document.addEventListener('mouseup', handleCanvasMouseUp);
+                
+                return () => {
+                    document.removeEventListener('mousemove', handleCanvasMouseMove);
+                    document.removeEventListener('mouseup', handleCanvasMouseUp);
+                };
+            }, [pan]);
+            
+            // Keyboard shortcuts
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key === 'Tab' && selectedNodeId) {
+                        e.preventDefault();
+                        addNode(selectedNodeId);
+                    }
+                    if (e.key === 'Delete' && selectedNodeId && selectedNodeId !== 'root') {
+                        deleteNode(selectedNodeId);
+                    }
+                    if (e.key === '=' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        setZoom(prev => Math.min(prev + 0.1, 2));
+                    }
+                    if (e.key === '-' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        setZoom(prev => Math.max(prev - 0.1, 0.5));
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [selectedNodeId]);
+            
+            return (
+                <>
+                    {/* Sidebar */}
+                    <div className="sidebar">
+                        <div className="sidebar-header">
+                            <h2 className="text-xl font-semibold">MindFlow Pro</h2>
+                            <p className="text-sm text-secondary">Advanced Mind Mapping</p>
+                        </div>
+                        <div className="sidebar-content">
+                            <div className="card">
+                                <h3 className="font-medium mb-3">Quick Actions</h3>
+                                <button 
+                                    className="btn btn-primary w-full mb-2"
+                                    onClick={() => addNode(selectedNodeId)}
+                                >
+                                    ➕ Add Node
+                                </button>
+                                <button 
+                                    className="btn btn-secondary w-full mb-2"
+                                    onClick={() => {
+                                        setNodes([nodes[0]]);
+                                        setConnections([]);
+                                    }}
+                                >
+                                    🔄 Clear Map
+                                </button>
+                            </div>
+                            
+                            <div className="card mt-4">
+                                <h3 className="font-medium mb-3">Node Styles</h3>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {NODE_COLORS.map(color => (
+                                        <div
+                                            key={color}
+                                            className="color-option"
+                                            style={{ background: color }}
+                                            onClick={() => {
+                                                if (selectedNodeId) {
+                                                    setNodes(prev => prev.map(n =>
+                                                        n.id === selectedNodeId ? { ...n, color } : n
+                                                    ));
+                                                }
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            
+                            <div className="card mt-4">
+                                <h3 className="font-medium mb-3">Statistics</h3>
+                                <div className="text-sm text-secondary">
+                                    <p>📊 Nodes: {nodes.length}</p>
+                                    <p>🔗 Connections: {connections.length}</p>
+                                    <p>🎯 Max Depth: {Math.max(...nodes.map(n => n.level)) + 1}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Canvas */}
+                    <div className="canvas-container">
+                        <div 
+                            ref={canvasRef}
+                            id="canvas"
+                            onMouseDown={handleCanvasMouseDown}
+                            style={{
+                                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                                transformOrigin: '0 0'
+                            }}
+                        >
+                            {/* Render Connections */}
+                            {connections.map(conn => {
+                                const endpoints = getConnectionEndpoints(conn);
+                                if (!endpoints) return null;
+                                
+                                return (
+                                    <Connection
+                                        key={conn.id}
+                                        start={endpoints.start}
+                                        end={endpoints.end}
+                                        selected={selectedNodeId === conn.from || selectedNodeId === conn.to}
+                                    />
+                                );
+                            })}
+                            
+                            {/* Render Nodes */}
+                            {nodes.map(node => (
+                                <Node
+                                    key={node.id}
+                                    node={node}
+                                    isSelected={selectedNodeId === node.id}
+                                    onSelect={setSelectedNodeId}
+                                    onEdit={editNodeText}
+                                    onDelete={deleteNode}
+                                    onConnect={(nodeId) => addNode(nodeId)}
+                                    onUpdatePosition={updateNodePosition}
+                                />
+                            ))}
+                        </div>
+                        
+                        {/* Toolbar */}
+                        <div className="toolbar">
+                            <button className="btn-icon" onClick={() => addNode()} title="Add Node">
+                                ➕
+                            </button>
+                            <button className="btn-icon" onClick={() => setZoom(1)} title="Reset View">
+                                🎯
+                            </button>
+                            <div className="toolbar-separator" />
+                            <button className="btn-icon" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} title="Zoom Out">
+                                ➖
+                            </button>
+                            <span className="text-sm text-muted px-2">{Math.round(zoom * 100)}%</span>
+                            <button className="btn-icon" onClick={() => setZoom(z => Math.min(z + 0.1, 2))} title="Zoom In">
+                                ➕
+                            </button>
+                        </div>
+                        
+                        {/* Save Indicator */}
+                        <div className={`save-indicator ${saveStatus}`}>
+                            {saveStatus === 'saving' && (
+                                <>
+                                    <span className="spinner" style={{ width: '16px', height: '16px' }} />
+                                    <span>Saving...</span>
+                                </>
+                            )}
+                            {saveStatus === 'saved' && (
+                                <>
+                                    <span>✓</span>
+                                    <span>All changes saved</span>
+                                </>
+                            )}
+                        </div>
+                        
+                        {/* Zoom Controls */}
+                        <div className="zoom-controls">
+                            <button className="zoom-btn" onClick={() => setZoom(z => Math.min(z + 0.1, 2))}>
+                                +
+                            </button>
+                            <div className="zoom-level">{Math.round(zoom * 100)}%</div>
+                            <button className="zoom-btn" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}>
+                                -
+                            </button>
+                        </div>
+                    </div>
+                </>
+            );
+        }
+        
+        // Render App
+        ReactDOM.render(<MindMapApp />, document.getElementById('app'));
+    </script>
+    
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</body>
+</html>
