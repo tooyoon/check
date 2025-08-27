@@ -28,7 +28,9 @@
       "Bash(cmd /c copy:*)",
       "Bash(del \"C:\\Users\\sogoy\\Desktop\\check\\supabase-config-new.js\")",
       "Bash(start http://localhost:8080/triday.html)",
-      "mcp__supabase__list_tables"
+      "mcp__supabase__list_tables",
+      "WebFetch(domain:check-ten-zeta.vercel.app)",
+      "WebFetch(domain:check-phi-six.vercel.app)"
     ],
     "deny": [],
     "ask": [],

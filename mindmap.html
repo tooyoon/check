@@ -2968,8 +2968,8 @@
                     localStorage.setItem('mindMapBoards', JSON.stringify(cloudMindmaps));
                 }
                 
-                // Initialize sync manager (disabled for now)
-                // await syncManager.initializeSync();
+                // Initialize sync manager
+                await syncManager.initializeSync();
                 
                 // Set up real-time sync for mindmap updates
                 window.updateMindmapUI = () => {

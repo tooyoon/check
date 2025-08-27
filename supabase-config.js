@@ -145,26 +145,10 @@ class UserManager {
     }
 
     async checkSubscription() {
-        if (!this.currentUser) return;
-
-        try {
-            const { data: subscription, error } = await supabase
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', this.currentUser.id)
-                .eq('status', 'active')
-                .single();
-
-            if (error) {
-                console.log('Subscription check error (expected if no subscription):', error.message);
-                this.subscription = null;
-            } else {
-                this.subscription = subscription;
-            }
-        } catch (err) {
-            console.log('Subscription check failed:', err);
-            this.subscription = null;
-        }
+        // Skip subscription check to prevent errors
+        // Subscriptions table doesn't exist yet
+        this.subscription = null;
+        return;
     }
 
     async syncLocalDataToCloud() {
