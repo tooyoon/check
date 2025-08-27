@@ -503,8 +503,8 @@
                 }, 60000); // 1분마다 체크
                 
                 // 사용자 정보 가져오기
-                if (window.userManager) {
-                    setUser(window.userManager.getUser());
+                if (window.userManager && window.userManager.user) {
+                    setUser(window.userManager.user);
                 }
                 
                 return () => clearInterval(interval);
