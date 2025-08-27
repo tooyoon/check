@@ -1664,12 +1664,6 @@
                                 📊 대시보드
                             </a>
                             <button
-                                onClick={() => syncManager.syncAll()}
-                                className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            >
-                                🔄 동기화
-                            </button>
-                            <button
                                 onClick={async () => {
                                     try {
                                         await userManager.signOut();
@@ -1711,6 +1705,7 @@
             const [editingCatId, setEditingCatId] = useState(null);
             const [editCatName, setEditCatName] = useState("");
             const [editCatEmoji, setEditCatEmoji] = useState("");
+            const [showEditEmojiPicker, setShowEditEmojiPicker] = useState(false);
             const [quickTaskText, setQuickTaskText] = useState("");
             const [showSearchResults, setShowSearchResults] = useState(false);
             const [highlightedTaskId, setHighlightedTaskId] = useState(null);
@@ -2424,11 +2419,6 @@
                         onClick={closeMobileMenu}
                     ></div>
 
-                    {/* Sync Indicator */}
-                    <div id="sync-indicator" className="sync-indicator offline" title="동기화 상태">
-                        <span className="sync-icon">🔄</span>
-                        <span className="sync-text">오프라인</span>
-                    </div>
 
                     {/* Sidebar */}
                     <aside className={cn("sidebar p-6", mobileMenuOpen && "mobile-open", showSearchResults && debouncedQuery && "search-open")}>
@@ -2458,18 +2448,14 @@
                         </div>
 
                         {/* 검색창 - 사이드바 */}
-                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50" style={{ position: 'relative', zIndex: showSearchResults && debouncedQuery ? 2000 : 2 }}>
-                            <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
-                                <span className="text-sm">🔍</span>
-                                <span>작업 검색</span>
-                            </div>
+                        <div className="mb-3" style={{ position: 'relative', zIndex: showSearchResults && debouncedQuery ? 2000 : 2 }}>
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 onFocus={() => setShowSearchResults(true)}
                                 onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
                                 placeholder="검색어 입력..."
-                                className="w-full px-2 py-1.5 h-8 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400"
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/90 text-gray-800 placeholder-gray-500 hover:bg-white transition-colors"
                             />
                             
                             {/* Search Results Dropdown */}
@@ -2530,17 +2516,13 @@
                         </div>
 
                         {/* 새 카테고리 추가 - 맨 위로 이동 */}
-                        <div className="mb-4 bg-white/60 backdrop-blur-sm rounded-xl p-2.5 border border-gray-200/50" style={{ position: 'relative', zIndex: 1 }}>
-                            <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-1">
-                                <span className="text-sm">➕</span>
-                                <span>새 카테고리</span>
-                            </div>
+                        <div className="mb-4" style={{ position: 'relative', zIndex: 1 }}>
                             <div className="space-y-2">
                                 <div className="flex gap-1">
                                     <button
                                         type="button"
                                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                        className="w-8 h-7 border border-gray-200 rounded flex items-center justify-center text-sm hover:bg-gray-50 transition-colors"
+                                        className="w-9 h-9 border border-gray-200 rounded-lg flex items-center justify-center text-base hover:bg-gray-50 transition-colors"
                                         title="이모지"
                                     >
                                         {selectedEmoji}
@@ -2550,20 +2532,20 @@
                                         onChange={(e) => setNewCatName(e.target.value)}
                                         onKeyDown={(e) => e.key === "Enter" && addCategory()}
                                         placeholder="이름..."
-                                        className="flex-1 min-w-0 px-2 py-1 h-7 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400"
+                                        className="flex-1 min-w-0 px-3 py-2 h-9 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500"
                                     />
                                     <button
                                         onClick={addCategory}
                                         disabled={!newCatName.trim()}
-                                        className="px-3 h-7 text-xs rounded bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed shadow-sm font-medium"
+                                        className="px-4 h-9 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
                                     >
                                         추가
                                     </button>
                                 </div>
                                 
                                 {showEmojiPicker && (
-                                    <div className="bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ position: 'relative', zIndex: 10 }}>
-                                        <div className="grid grid-cols-8 gap-0.5 max-h-32 overflow-y-auto">
+                                    <div className="bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ position: 'absolute', zIndex: 10, left: 0, right: 0 }}>
+                                        <div className="grid grid-cols-8 gap-0.5 max-h-32" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
                                             {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
                                               "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
                                               "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
@@ -2604,49 +2586,70 @@
                                         )}
                                     >
                                         {editingCatId === c.id ? (
-                                            <div className="flex-1 space-y-2">
-                                                <div className="space-y-1.5">
-                                                    <div className="flex gap-1">
-                                                        <input
-                                                            value={editCatEmoji}
-                                                            onChange={(e) => setEditCatEmoji(e.target.value)}
-                                                            placeholder="🏷️"
-                                                            className="w-8 h-7 px-0 text-center text-sm border rounded text-gray-800 bg-white"
-                                                            maxLength={2}
-                                                        />
-                                                        <input
-                                                            value={editCatName}
-                                                            onChange={(e) => {
-                                                                // 최대 길이 제한
-                                                                if (e.target.value.length <= 15) {
-                                                                    setEditCatName(e.target.value);
-                                                                }
-                                                            }}
-                                                            placeholder="이름"
-                                                            className="flex-1 min-w-0 h-7 px-1.5 text-xs border rounded text-gray-800 bg-white"
-                                                            autoFocus
-                                                            onFocus={(e) => e.target.select()}
-                                                            onKeyDown={(e) => {
-                                                                if (e.key === "Enter") saveEditCategory();
-                                                                if (e.key === "Escape") cancelEditCategory();
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <div className="flex gap-1">
-                                                        <button
-                                                            onClick={saveEditCategory}
-                                                            className="flex-1 px-1 py-0.5 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 font-medium"
-                                                        >
-                                                            ✓
-                                                        </button>
-                                                        <button
-                                                            onClick={cancelEditCategory}
-                                                            className="flex-1 px-1 py-0.5 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
+                                            <div className="flex-1">
+                                                <div className="flex gap-1 items-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowEditEmojiPicker(!showEditEmojiPicker)}
+                                                        className="w-8 h-8 border border-gray-200 rounded flex items-center justify-center text-sm hover:bg-gray-50 transition-colors"
+                                                    >
+                                                        {editCatEmoji}
+                                                    </button>
+                                                    <input
+                                                        value={editCatName}
+                                                        onChange={(e) => {
+                                                            if (e.target.value.length <= 15) {
+                                                                setEditCatName(e.target.value);
+                                                            }
+                                                        }}
+                                                        placeholder="이름"
+                                                        className="flex-1 min-w-0 h-8 px-2 text-sm border border-gray-200 rounded text-gray-800 bg-white"
+                                                        autoFocus
+                                                        onFocus={(e) => e.target.select()}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter") { saveEditCategory(); setShowEditEmojiPicker(false); }
+                                                            if (e.key === "Escape") { cancelEditCategory(); setShowEditEmojiPicker(false); }
+                                                        }}
+                                                    />
+                                                    <button
+                                                        onClick={() => { saveEditCategory(); setShowEditEmojiPicker(false); }}
+                                                        className="px-2 h-8 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                                                    >
+                                                        ✓
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { cancelEditCategory(); setShowEditEmojiPicker(false); }}
+                                                        className="px-2 h-8 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                                                    >
+                                                        ✕
+                                                    </button>
                                                 </div>
+                                                {showEditEmojiPicker && (
+                                                    <div className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg p-2 shadow-lg" style={{ zIndex: 100 }}>
+                                                        <div className="grid grid-cols-8 gap-0.5 max-h-32" style={{ overflowY: 'auto', overflowX: 'hidden' }}>
+                                                            {["📁", "📂", "🗂️", "📋", "📌", "📎", "🔖", "🏷️",
+                                                              "📦", "📫", "📪", "🗳️", "📝", "📄", "📑", "🗒️",
+                                                              "📔", "📓", "📕", "📗", "📘", "📙", "📚", "📖",
+                                                              "🔮", "💎", "🎯", "🎨", "🎭", "🎪", "🎲", "🎮",
+                                                              "⭐", "🌟", "💫", "✨", "🔥", "💥", "⚡", "🌈",
+                                                              "🏠", "🏢", "🏆", "🎁", "🎉", "🎊", "💼", "💰",
+                                                              "🔧", "🔨", "⚙️", "🧰", "🔬", "🔭", "💻", "🖥️",
+                                                              "🌸", "🌺", "🌻", "🌹", "🌷", "🌱", "🌳", "🍀"].map(emoji => (
+                                                                <button
+                                                                    key={emoji}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditCatEmoji(emoji);
+                                                                        setShowEditEmojiPicker(false);
+                                                                    }}
+                                                                    className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded text-sm transition-colors"
+                                                                >
+                                                                    {emoji}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <>
@@ -2742,16 +2745,6 @@
                                             <a href="dashboard.html" className="w-full px-4 py-2 text-left rounded-xl hover:bg-gray-100 flex items-center gap-2 text-sm">
                                                 📊 대시보드
                                             </a>
-                                            <button
-                                                onClick={async () => {
-                                                    if (syncManager && syncManager.syncAll) {
-                                                        await syncManager.syncAll();
-                                                    }
-                                                }}
-                                                className="w-full px-4 py-2 text-left rounded-xl hover:bg-gray-100 flex items-center gap-2 text-sm"
-                                            >
-                                                🔄 동기화
-                                            </button>
                                             <button
                                                 onClick={async () => {
                                                     await userManager.signOut();
