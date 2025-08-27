@@ -55,6 +55,17 @@
             50% { transform: scale(1.03); background-color: #dcfce7; }
             100% { transform: scale(1); }
         }
+        
+        /* Search result highlight animation */
+        .highlight-animation {
+            animation: highlight 2s ease-in-out;
+            position: relative;
+        }
+        
+        @keyframes highlight {
+            0%, 100% { background-color: transparent; }
+            20%, 80% { background-color: rgba(59, 130, 246, 0.1); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
+        }
 
         /* =============== Glass Effects =============== */
         .glassmorphism {
@@ -1695,6 +1706,8 @@
             const [editCatName, setEditCatName] = useState("");
             const [editCatEmoji, setEditCatEmoji] = useState("");
             const [quickTaskText, setQuickTaskText] = useState("");
+            const [showSearchResults, setShowSearchResults] = useState(false);
+            const [highlightedTaskId, setHighlightedTaskId] = useState(null);
             const fileInputRef = useRef(null);
             const textFileInputRef = useRef(null);
 
@@ -1702,6 +1715,7 @@
             useEffect(() => {
                 const timer = setTimeout(() => {
                     setDebouncedQuery(query);
+                    setShowSearchResults(query.length > 0);
                 }, 300);
                 return () => clearTimeout(timer);
             }, [query]);
@@ -2104,6 +2118,35 @@
                 setEditCatName("");
                 setEditCatEmoji("");
             }
+            
+            // Jump to task when clicking search result
+            function jumpToTask(taskId) {
+                const task = tasks.find(t => t.id === taskId);
+                if (!task) return;
+                
+                // Switch to task's category
+                setSelectedCat(task.categoryId);
+                
+                // Clear search
+                setQuery("");
+                setShowSearchResults(false);
+                
+                // Highlight the task
+                setHighlightedTaskId(taskId);
+                
+                // Scroll to task after DOM updates
+                setTimeout(() => {
+                    const element = document.querySelector(`[data-task-id="${taskId}"]`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        element.classList.add('highlight-animation');
+                        setTimeout(() => {
+                            element.classList.remove('highlight-animation');
+                            setHighlightedTaskId(null);
+                        }, 2000);
+                    }
+                }, 100);
+            }
 
             // =============== 폰트 크기 조절 기능 ===============
             function increaseFontSize() {
@@ -2409,7 +2452,7 @@
                         </div>
 
                         <div className="mb-6">
-                            <div className="font-semibold mb-3 text-gray-700">📂 카테고리</div>
+                            <div className="text-sm font-semibold mb-3 text-gray-700">📂 카테고리</div>
                             <div className="space-y-2">
                                 {categories.map((c) => (
                                     <div
@@ -2428,15 +2471,16 @@
                                                         value={editCatEmoji}
                                                         onChange={(e) => setEditCatEmoji(e.target.value)}
                                                         placeholder="🏷️"
-                                                        className="w-12 px-2 py-1 border rounded text-center text-gray-800 bg-white"
+                                                        className="w-10 px-1 py-1 text-sm border rounded text-center text-gray-800 bg-white"
                                                         maxLength={2}
                                                     />
                                                     <input
                                                         value={editCatName}
                                                         onChange={(e) => setEditCatName(e.target.value)}
-                                                        placeholder="카테고리 이름"
-                                                        className="flex-1 px-2 py-1 border rounded text-gray-800 bg-white"
+                                                        placeholder="이름"
+                                                        className="flex-1 px-2 py-1 text-sm border rounded text-gray-800 bg-white"
                                                         autoFocus
+                                                        onFocus={(e) => e.target.select()}
                                                         onKeyDown={(e) => {
                                                             if (e.key === "Enter") saveEditCategory();
                                                             if (e.key === "Escape") cancelEditCategory();
@@ -2502,17 +2546,17 @@
                                 ))}
                             </div>
                             
-                            <div className="mt-6 bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-gray-200/50">
-                                <div className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                                    <span>➕</span>
-                                    새 카테고리 추가
+                            <div className="mt-6 bg-white/60 backdrop-blur-sm rounded-2xl p-3 border border-gray-200/50">
+                                <div className="text-xs font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                    <span className="text-sm">➕</span>
+                                    <span>새 카테고리</span>
                                 </div>
                                 <div className="space-y-3">
                                     <div className="flex gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                            className="w-14 h-12 border border-gray-200 rounded-xl flex items-center justify-center text-xl hover:bg-gray-50 transition-colors"
+                                            className="w-10 h-9 border border-gray-200 rounded-lg flex items-center justify-center text-lg hover:bg-gray-50 transition-colors"
                                             title="이모지 선택"
                                         >
                                             {selectedEmoji}
@@ -2521,8 +2565,8 @@
                                             value={newCatName}
                                             onChange={(e) => setNewCatName(e.target.value)}
                                             onKeyDown={(e) => e.key === "Enter" && addCategory()}
-                                            placeholder="카테고리 이름을 입력하세요..."
-                                            className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
+                                            placeholder="이름 입력..."
+                                            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-400"
                                         />
                                     </div>
                                     
@@ -2556,10 +2600,10 @@
                                     <button
                                         onClick={addCategory}
                                         disabled={!newCatName.trim()}
-                                        className="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-2"
+                                        className="w-full px-3 py-2 text-sm rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-1"
                                     >
                                         <span>✨</span>
-                                        추가하기
+                                        <span>추가</span>
                                     </button>
                                 </div>
                             </div>
@@ -2737,13 +2781,58 @@
                             {/* Filters */}
                             <div className="glassmorphism rounded-2xl p-4 mb-6 fade-in">
                                 <div className="flex flex-wrap gap-3 md:mobile-filter-grid">
-                                    <div className="flex-1 min-w-64">
+                                    <div className="flex-1 min-w-64 relative">
                                         <input
                                             value={query}
                                             onChange={(e) => setQuery(e.target.value)}
+                                            onFocus={() => query && setShowSearchResults(true)}
                                             placeholder="🔍 작업 검색..."
                                             className="w-full px-4 py-3 border-0 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white/70 backdrop-blur-sm font-medium form-input"
                                         />
+                                        
+                                        {/* Search Results Dropdown */}
+                                        {showSearchResults && debouncedQuery && (
+                                            <div className="absolute top-full left-0 right-0 mt-2 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl z-50">
+                                                {(() => {
+                                                    const searchResults = tasks.filter(t => 
+                                                        t.title.toLowerCase().includes(debouncedQuery.toLowerCase()) || 
+                                                        (t.memo && t.memo.toLowerCase().includes(debouncedQuery.toLowerCase()))
+                                                    );
+                                                    
+                                                    if (searchResults.length === 0) {
+                                                        return (
+                                                            <div className="p-4 text-center text-gray-500">
+                                                                검색 결과가 없습니다
+                                                            </div>
+                                                        );
+                                                    }
+                                                    
+                                                    return searchResults.map(task => {
+                                                        const category = categories.find(c => c.id === task.categoryId);
+                                                        return (
+                                                            <button
+                                                                key={task.id}
+                                                                onClick={() => jumpToTask(task.id)}
+                                                                className="w-full p-3 text-left hover:bg-gray-50 border-b border-gray-100 transition-colors"
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-xs px-2 py-1 rounded-lg bg-gray-100">
+                                                                        {category?.emoji} {category?.name}
+                                                                    </span>
+                                                                    {task.checked && <span className="text-green-500">✓</span>}
+                                                                </div>
+                                                                <div className="font-medium mt-1">{task.title}</div>
+                                                                {task.memo && (
+                                                                    <div className="text-sm text-gray-500 truncate">
+                                                                        {task.memo}
+                                                                    </div>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    });
+                                                })()}
+                                            </div>
+                                        )}
                                     </div>
                                     <select
                                         value={statusFilter}
