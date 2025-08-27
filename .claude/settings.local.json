@@ -30,7 +30,8 @@
       "Bash(start http://localhost:8080/triday.html)",
       "mcp__supabase__list_tables",
       "WebFetch(domain:check-ten-zeta.vercel.app)",
-      "WebFetch(domain:check-phi-six.vercel.app)"
+      "WebFetch(domain:check-phi-six.vercel.app)",
+      "Bash(del mindmap-improved.html)"
     ],
     "deny": [],
     "ask": [],

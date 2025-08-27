@@ -228,35 +228,102 @@ class UserManager {
     async saveMindmaps(mindmaps) {
         if (!this.currentUser) return;
 
-        const { error } = await supabase
-            .from('mindmaps')
-            .upsert({
-                user_id: this.currentUser.id,
-                data: mindmaps,
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id'
-            });
+        try {
+            // Convert mindmap boards format to nodes/connections
+            let nodes = [];
+            let connections = [];
+            
+            // Handle different data formats
+            if (Array.isArray(mindmaps)) {
+                // Array of boards - extract nodes and connections from first board
+                if (mindmaps.length > 0 && mindmaps[0].nodes) {
+                    nodes = mindmaps[0].nodes || [];
+                    connections = mindmaps[0].connections || [];
+                }
+            } else if (mindmaps.nodes && mindmaps.connections) {
+                // Direct nodes/connections format
+                nodes = mindmaps.nodes;
+                connections = mindmaps.connections;
+            } else if (typeof mindmaps === 'object') {
+                // Object with board IDs - get first board
+                const firstBoard = Object.values(mindmaps)[0];
+                if (firstBoard && firstBoard.nodes) {
+                    nodes = firstBoard.nodes || [];
+                    connections = firstBoard.connections || [];
+                }
+            }
 
-        if (error) {
-            console.error('Mindmap save error:', error);
+            // Check if user already has a mindmap
+            const { data: existing } = await supabase
+                .from('mindmaps')
+                .select('id')
+                .eq('user_id', this.currentUser.id)
+                .single();
+
+            if (existing) {
+                // Update existing
+                const { error } = await supabase
+                    .from('mindmaps')
+                    .update({
+                        nodes: nodes,
+                        connections: connections,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (error) {
+                    console.error('Mindmap update error:', error);
+                }
+            } else {
+                // Create new
+                const { error } = await supabase
+                    .from('mindmaps')
+                    .insert({
+                        user_id: this.currentUser.id,
+                        title: 'My Mindmap',
+                        nodes: nodes,
+                        connections: connections
+                    });
+
+                if (error) {
+                    console.error('Mindmap insert error:', error);
+                }
+            }
+        } catch (err) {
+            console.error('Mindmap save error:', err);
         }
     }
 
     async loadMindmaps() {
         if (!this.currentUser) return null;
 
-        const { data, error } = await supabase
-            .from('mindmaps')
-            .select('data')
-            .eq('user_id', this.currentUser.id)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('mindmaps')
+                .select('nodes, connections')
+                .eq('user_id', this.currentUser.id)
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .single();
 
-        if (error || !data) {
+            if (error || !data) {
+                return null;
+            }
+
+            // Convert back to board format for compatibility
+            const boardId = 'default';
+            return {
+                [boardId]: {
+                    id: boardId,
+                    name: 'My Mindmap',
+                    nodes: data.nodes || [],
+                    connections: data.connections || []
+                }
+            };
+        } catch (err) {
+            console.error('Mindmap load error:', err);
             return null;
         }
-
-        return data.data;
     }
 
     async saveLocalDataBackup() {
