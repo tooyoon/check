@@ -31,7 +31,9 @@
       "mcp__supabase__list_tables",
       "WebFetch(domain:check-ten-zeta.vercel.app)",
       "WebFetch(domain:check-phi-six.vercel.app)",
-      "Bash(del mindmap-improved.html)"
+      "Bash(del mindmap-improved.html)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c:*)"
     ],
     "deny": [],
     "ask": [],
