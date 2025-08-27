@@ -617,31 +617,49 @@
         
         // Vote toggle
         async function toggleVote(feedbackId) {
-            const hasVoted = userVotes[feedbackId];
-            
-            if (hasVoted) {
-                delete userVotes[feedbackId];
-                // Decrease vote count
-                const feedback = feedbacks.find(f => f.id === feedbackId);
-                if (feedback) feedback.votes = (feedback.votes || 0) - 1;
-            } else {
-                userVotes[feedbackId] = true;
-                // Increase vote count
-                const feedback = feedbacks.find(f => f.id === feedbackId);
-                if (feedback) feedback.votes = (feedback.votes || 0) + 1;
+            // Check if user is logged in
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                showMessage('투표하려면 로그인이 필요합니다.', 'error');
+                return;
             }
             
-            localStorage.setItem('feedbackVotes', JSON.stringify(userVotes));
+            const voteKey = `${user.id}_${feedbackId}`;
+            const hasVoted = userVotes[voteKey];
+            const feedback = feedbacks.find(f => f.id === feedbackId);
+            if (!feedback) return;
             
-            // Update in Supabase
             try {
-                const feedback = feedbacks.find(f => f.id === feedbackId);
-                await supabase
+                if (hasVoted) {
+                    delete userVotes[voteKey];
+                    feedback.votes = Math.max(0, (feedback.votes || 0) - 1);
+                } else {
+                    userVotes[voteKey] = true;
+                    feedback.votes = (feedback.votes || 0) + 1;
+                }
+                
+                localStorage.setItem('feedbackVotes', JSON.stringify(userVotes));
+                
+                // Update in Supabase
+                const { error } = await supabase
                     .from('feedback')
                     .update({ votes: feedback.votes })
                     .eq('id', feedbackId);
+                    
+                if (error) throw error;
+                
+                displayFeedbacks(); // Refresh display
             } catch (error) {
                 console.error('Failed to update vote:', error);
+                // Revert on error
+                if (hasVoted) {
+                    userVotes[voteKey] = true;
+                    feedback.votes = (feedback.votes || 0) + 1;
+                } else {
+                    delete userVotes[voteKey];
+                    feedback.votes = Math.max(0, (feedback.votes || 0) - 1);
+                }
+                localStorage.setItem('feedbackVotes', JSON.stringify(userVotes));
             }
             
             displayFeedbacks();

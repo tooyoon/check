@@ -30,5 +30,8 @@
     "additionalDirectories": [
       "C:\\Users\\sogoy\\Desktop"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }
