@@ -652,29 +652,18 @@
         
         // Main MindMap Component
         function MindMapApp() {
-            // Load saved data from localStorage
-            const loadSavedData = () => {
-                const saved = localStorage.getItem('mindmap-data');
-                if (saved) {
-                    try {
-                        const data = JSON.parse(saved);
-                        return {
-                            nodes: data.nodes || [{ id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }],
-                            connections: data.connections || []
-                        };
-                    } catch (e) {
-                        console.error('Failed to load saved mindmap:', e);
-                    }
-                }
-                return {
-                    nodes: [{ id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }],
-                    connections: []
-                };
+            const [currentUser, setCurrentUser] = useState(null);
+            const [currentMindmapId, setCurrentMindmapId] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            
+            // Default mindmap data
+            const defaultMindmap = {
+                nodes: [{ id: 'root', text: 'Main Idea', x: 400, y: 300, level: 0, icon: '🧠' }],
+                connections: []
             };
             
-            const initialData = loadSavedData();
-            const [nodes, setNodes] = useState(initialData.nodes);
-            const [connections, setConnections] = useState(initialData.connections);
+            const [nodes, setNodes] = useState(defaultMindmap.nodes);
+            const [connections, setConnections] = useState(defaultMindmap.connections);
             const [selectedNodeId, setSelectedNodeId] = useState(null);
             const [zoom, setZoom] = useState(1);
             const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -682,6 +671,153 @@
             const canvasRef = useRef(null);
             const isPanning = useRef(false);
             const panStart = useRef({ x: 0, y: 0 });
+            
+            // Check authentication and load mindmap on mount
+            useEffect(() => {
+                checkAuthAndLoadMindmap();
+            }, []);
+            
+            // Check authentication and load mindmap
+            const checkAuthAndLoadMindmap = async () => {
+                try {
+                    // Check if user is logged in
+                    const { data: { user } } = await supabase.auth.getUser();
+                    setCurrentUser(user);
+                    
+                    if (user) {
+                        // Load user's mindmap from Supabase
+                        await loadMindmapFromSupabase(user.id);
+                    } else {
+                        // Load from localStorage for non-authenticated users
+                        loadFromLocalStorage();
+                    }
+                } catch (error) {
+                    console.error('Auth check failed:', error);
+                    loadFromLocalStorage();
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            
+            // Load mindmap from Supabase
+            const loadMindmapFromSupabase = async (userId) => {
+                try {
+                    // Get the most recent mindmap for this user
+                    const { data, error } = await supabase
+                        .from('mindmaps')
+                        .select('*')
+                        .eq('user_id', userId)
+                        .order('updated_at', { ascending: false })
+                        .limit(1)
+                        .single();
+                    
+                    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+                        console.error('Failed to load mindmap:', error);
+                        loadFromLocalStorage();
+                        return;
+                    }
+                    
+                    if (data) {
+                        // Load existing mindmap
+                        setCurrentMindmapId(data.id);
+                        setNodes(data.nodes || defaultMindmap.nodes);
+                        setConnections(data.connections || defaultMindmap.connections);
+                    } else {
+                        // Create new mindmap for user
+                        await createNewMindmap(userId);
+                    }
+                } catch (error) {
+                    console.error('Failed to load from Supabase:', error);
+                    loadFromLocalStorage();
+                }
+            };
+            
+            // Create new mindmap in Supabase
+            const createNewMindmap = async (userId) => {
+                try {
+                    const { data, error } = await supabase
+                        .from('mindmaps')
+                        .insert([{
+                            user_id: userId,
+                            title: 'My Mindmap',
+                            nodes: defaultMindmap.nodes,
+                            connections: defaultMindmap.connections
+                        }])
+                        .select()
+                        .single();
+                    
+                    if (error) throw error;
+                    
+                    setCurrentMindmapId(data.id);
+                    setNodes(data.nodes);
+                    setConnections(data.connections);
+                } catch (error) {
+                    console.error('Failed to create mindmap:', error);
+                    loadFromLocalStorage();
+                }
+            };
+            
+            // Load from localStorage (fallback)
+            const loadFromLocalStorage = () => {
+                const saved = localStorage.getItem('mindmap-data');
+                if (saved) {
+                    try {
+                        const data = JSON.parse(saved);
+                        setNodes(data.nodes || defaultMindmap.nodes);
+                        setConnections(data.connections || defaultMindmap.connections);
+                    } catch (e) {
+                        console.error('Failed to load from localStorage:', e);
+                        setNodes(defaultMindmap.nodes);
+                        setConnections(defaultMindmap.connections);
+                    }
+                } else {
+                    setNodes(defaultMindmap.nodes);
+                    setConnections(defaultMindmap.connections);
+                }
+            };
+            
+            // Save to Supabase
+            const saveToSupabase = async () => {
+                if (!currentUser || !currentMindmapId) {
+                    // Save to localStorage only if not logged in
+                    saveToLocalStorage();
+                    return;
+                }
+                
+                try {
+                    setSaveStatus('saving');
+                    
+                    const { error } = await supabase
+                        .from('mindmaps')
+                        .update({
+                            nodes: nodes,
+                            connections: connections,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', currentMindmapId);
+                    
+                    if (error) throw error;
+                    
+                    setSaveStatus('saved');
+                    // Also save to localStorage as backup
+                    saveToLocalStorage();
+                } catch (error) {
+                    console.error('Failed to save to Supabase:', error);
+                    setSaveStatus('error');
+                    // Fallback to localStorage
+                    saveToLocalStorage();
+                }
+            };
+            
+            // Save to localStorage
+            const saveToLocalStorage = () => {
+                const mindmapData = {
+                    nodes: nodes,
+                    connections: connections,
+                    savedAt: new Date().toISOString()
+                };
+                localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
+            };
             
             // Add new node
             const addNode = useCallback((parentId = null) => {
@@ -857,15 +993,12 @@
                 };
             }, [pan]);
             
-            // Auto-save to localStorage
+            // Auto-save to Supabase/localStorage
             useEffect(() => {
+                if (isLoading) return; // Don't save while loading
+                
                 const saveTimer = setTimeout(() => {
-                    const mindmapData = {
-                        nodes: nodes,
-                        connections: connections,
-                        savedAt: new Date().toISOString()
-                    };
-                    localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
+                    saveToSupabase();
                 }, 1000); // Save after 1 second of inactivity
                 
                 return () => clearTimeout(saveTimer);
@@ -892,19 +1025,25 @@
                     if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
                         e.preventDefault();
                         // Manual save
-                        const mindmapData = {
-                            nodes: nodes,
-                            connections: connections,
-                            savedAt: new Date().toISOString()
-                        };
-                        localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
-                        setSaveStatus('saved');
+                        saveToSupabase();
                     }
                 };
                 
                 window.addEventListener('keydown', handleKeyDown);
                 return () => window.removeEventListener('keydown', handleKeyDown);
             }, [selectedNodeId, nodes, connections]);
+            
+            // Show loading state
+            if (isLoading) {
+                return (
+                    <div className="flex items-center justify-center h-screen">
+                        <div className="text-center">
+                            <div className="spinner" style={{ width: '48px', height: '48px', margin: '0 auto' }}></div>
+                            <p className="mt-4 text-gray-600">Loading mindmap...</p>
+                        </div>
+                    </div>
+                );
+            }
             
             return (
                 <>
@@ -913,6 +1052,43 @@
                         <div className="sidebar-header">
                             <h2 className="text-xl font-semibold">MindFlow Pro</h2>
                             <p className="text-sm text-secondary">Advanced Mind Mapping</p>
+                            
+                            {/* Auth Status */}
+                            <div className="mt-3 p-2 bg-white bg-opacity-50 rounded" style={{ fontSize: '12px' }}>
+                                {currentUser ? (
+                                    <div className="flex justify-between items-center">
+                                        <span>👤 {currentUser.email?.split('@')[0]}</span>
+                                        <button 
+                                            onClick={async () => {
+                                                await supabase.auth.signOut();
+                                                location.reload();
+                                            }}
+                                            className="text-red-500 hover:underline"
+                                        >
+                                            로그아웃
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-center">
+                                        <p className="mb-2">로그인하면 클라우드 저장이 가능합니다</p>
+                                        <button
+                                            onClick={async () => {
+                                                const { error } = await supabase.auth.signInWithOAuth({
+                                                    provider: 'google',
+                                                    options: {
+                                                        redirectTo: window.location.origin + '/mindmap-improved.html'
+                                                    }
+                                                });
+                                                if (error) console.error('Login failed:', error);
+                                            }}
+                                            className="btn btn-primary w-full"
+                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                        >
+                                            Google로 로그인
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="sidebar-content">
                             <div className="card">
@@ -1036,15 +1212,8 @@
                                 <span style={{ fontSize: '10px', marginTop: '2px' }}>정렬</span>
                             </button>
                             <button className="btn-icon" onClick={() => {
-                                // Save to localStorage
-                                const mindmapData = {
-                                    nodes: nodes,
-                                    connections: connections,
-                                    savedAt: new Date().toISOString()
-                                };
-                                localStorage.setItem('mindmap-data', JSON.stringify(mindmapData));
-                                setSaveStatus('saved');
-                                setTimeout(() => setSaveStatus('saved'), 2000);
+                                // Save to Supabase or localStorage
+                                saveToSupabase();
                             }} title="Save" style={{ flexDirection: 'column', padding: '8px', height: 'auto' }}>
                                 <span style={{ fontSize: '20px' }}>💾</span>
                                 <span style={{ fontSize: '10px', marginTop: '2px' }}>저장</span>
@@ -1068,13 +1237,19 @@
                             {saveStatus === 'saving' && (
                                 <>
                                     <span className="spinner" style={{ width: '16px', height: '16px' }} />
-                                    <span>Saving...</span>
+                                    <span>{currentUser ? 'Saving to cloud...' : 'Saving locally...'}</span>
                                 </>
                             )}
                             {saveStatus === 'saved' && (
                                 <>
                                     <span>✓</span>
-                                    <span>All changes saved</span>
+                                    <span>{currentUser ? '☁️ Cloud saved' : '💾 Locally saved'}</span>
+                                </>
+                            )}
+                            {saveStatus === 'error' && (
+                                <>
+                                    <span>⚠️</span>
+                                    <span>Save failed (saved locally)</span>
                                 </>
                             )}
                         </div>
