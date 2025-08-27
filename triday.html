@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+    <title>TriDay Calendar - 하루를 3배로</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js?v=3.0"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📅</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .time-section {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .time-section:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+        
+        .morning-section {
+            background: linear-gradient(135deg, #ffd93d 0%, #ffb347 100%);
+        }
+        
+        .lunch-section {
+            background: linear-gradient(135deg, #ff9a3c 0%, #ff6b6b 100%);
+        }
+        
+        .evening-section {
+            background: linear-gradient(135deg, #6b5b95 0%, #8e44ad 100%);
+        }
+        
+        .task-item {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 12px;
+            margin: 8px 0;
+            cursor: move;
+            transition: all 0.3s ease;
+        }
+        
+        .task-item:hover {
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .task-item.completed {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+        
+        .progress-bar {
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .time-gauge {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+        }
+        
+        .time-gauge::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+        
+        .routine-chip {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 4px;
+            background: #f0f0f0;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .routine-chip:hover {
+            background: #667eea;
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .goal-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        @keyframes firework {
+            0% { transform: translate(0, 0); opacity: 1; }
+            100% { transform: translate(var(--x), var(--y)); opacity: 0; }
+        }
+        
+        .firework {
+            position: fixed;
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            animation: firework 1s ease-out forwards;
+            pointer-events: none;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+        
+        // TriDay Calendar Component
+        function TriDayCalendar() {
+            const [tasks, setTasks] = useState({
+                morning: [],
+                lunch: [],
+                evening: []
+            });
+            
+            const [routines, setRoutines] = useState([
+                { id: 1, name: '운동', time: 'morning', icon: '🏃' },
+                { id: 2, name: '명상', time: 'morning', icon: '🧘' },
+                { id: 3, name: '독서', time: 'evening', icon: '📚' },
+                { id: 4, name: '일기', time: 'evening', icon: '✍️' }
+            ]);
+            
+            const [goals, setGoals] = useState({
+                yearly: '',
+                monthly: '',
+                weekly: ''
+            });
+            
+            const [timeRanges, setTimeRanges] = useState({
+                morning: { start: '06:00', end: '12:00' },
+                lunch: { start: '12:00', end: '18:00' },
+                evening: { start: '18:00', end: '24:00' }
+            });
+            
+            const [showRoutineManager, setShowRoutineManager] = useState(false);
+            const [newTask, setNewTask] = useState('');
+            const [selectedSection, setSelectedSection] = useState('morning');
+            const [progress, setProgress] = useState(0);
+            
+            // 현재 시간대 확인
+            const getCurrentSection = () => {
+                const hour = new Date().getHours();
+                if (hour < 12) return 'morning';
+                if (hour < 18) return 'lunch';
+                return 'evening';
+            };
+            
+            const [currentSection, setCurrentSection] = useState(getCurrentSection());
+            
+            // 태스크 추가
+            const addTask = (section, taskText) => {
+                if (!taskText.trim()) return;
+                
+                const newTaskItem = {
+                    id: Date.now(),
+                    text: taskText,
+                    completed: false,
+                    time: new Date().toLocaleTimeString(),
+                    section: section
+                };
+                
+                setTasks(prev => ({
+                    ...prev,
+                    [section]: [...prev[section], newTaskItem]
+                }));
+                
+                setNewTask('');
+                saveToLocal();
+            };
+            
+            // 태스크 완료 토글
+            const toggleTask = (section, taskId) => {
+                setTasks(prev => ({
+                    ...prev,
+                    [section]: prev[section].map(task => 
+                        task.id === taskId 
+                            ? { ...task, completed: !task.completed }
+                            : task
+                    )
+                }));
+                
+                // 완료시 폭죽 효과
+                const updatedTask = tasks[section].find(t => t.id === taskId);
+                if (!updatedTask?.completed) {
+                    createFireworks();
+                }
+                
+                updateProgress();
+                saveToLocal();
+            };
+            
+            // 태스크 삭제
+            const deleteTask = (section, taskId) => {
+                setTasks(prev => ({
+                    ...prev,
+                    [section]: prev[section].filter(task => task.id !== taskId)
+                }));
+                
+                updateProgress();
+                saveToLocal();
+            };
+            
+            // 드래그 앤 드롭
+            const handleDragStart = (e, task, fromSection) => {
+                e.dataTransfer.setData('task', JSON.stringify(task));
+                e.dataTransfer.setData('fromSection', fromSection);
+            };
+            
+            const handleDrop = (e, toSection) => {
+                e.preventDefault();
+                const task = JSON.parse(e.dataTransfer.getData('task'));
+                const fromSection = e.dataTransfer.getData('fromSection');
+                
+                if (fromSection !== toSection) {
+                    setTasks(prev => ({
+                        ...prev,
+                        [fromSection]: prev[fromSection].filter(t => t.id !== task.id),
+                        [toSection]: [...prev[toSection], { ...task, section: toSection }]
+                    }));
+                    saveToLocal();
+                }
+            };
+            
+            const handleDragOver = (e) => {
+                e.preventDefault();
+            };
+            
+            // 루틴 불러오기
+            const loadRoutines = (section) => {
+                const sectionRoutines = routines.filter(r => r.time === section);
+                const newTasks = sectionRoutines.map(routine => ({
+                    id: Date.now() + Math.random(),
+                    text: routine.name,
+                    completed: false,
+                    time: new Date().toLocaleTimeString(),
+                    section: section,
+                    icon: routine.icon
+                }));
+                
+                setTasks(prev => ({
+                    ...prev,
+                    [section]: [...prev[section], ...newTasks]
+                }));
+                
+                saveToLocal();
+            };
+            
+            // 진행률 업데이트
+            const updateProgress = () => {
+                const allTasks = [
+                    ...tasks.morning,
+                    ...tasks.lunch,
+                    ...tasks.evening
+                ];
+                
+                if (allTasks.length === 0) {
+                    setProgress(0);
+                    return;
+                }
+                
+                const completedTasks = allTasks.filter(t => t.completed).length;
+                const newProgress = Math.round((completedTasks / allTasks.length) * 100);
+                setProgress(newProgress);
+                
+                // 100% 달성시 특별 효과
+                if (newProgress === 100 && allTasks.length > 0) {
+                    createMegaFireworks();
+                }
+            };
+            
+            // 폭죽 효과
+            const createFireworks = () => {
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#ffd93d', '#6bcf7f'];
+                const container = document.createElement('div');
+                container.style.position = 'fixed';
+                container.style.top = '0';
+                container.style.left = '0';
+                container.style.width = '100%';
+                container.style.height = '100%';
+                container.style.pointerEvents = 'none';
+                container.style.zIndex = '9999';
+                document.body.appendChild(container);
+                
+                for (let i = 0; i < 30; i++) {
+                    const firework = document.createElement('div');
+                    firework.className = 'firework';
+                    firework.style.left = '50%';
+                    firework.style.top = '50%';
+                    firework.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    firework.style.setProperty('--x', (Math.random() - 0.5) * 400 + 'px');
+                    firework.style.setProperty('--y', (Math.random() - 0.5) * 400 + 'px');
+                    container.appendChild(firework);
+                }
+                
+                setTimeout(() => container.remove(), 1500);
+            };
+            
+            const createMegaFireworks = () => {
+                for (let i = 0; i < 3; i++) {
+                    setTimeout(() => createFireworks(), i * 200);
+                }
+            };
+            
+            // 로컬 스토리지 저장/로드
+            const saveToLocal = () => {
+                const data = {
+                    tasks,
+                    goals,
+                    routines,
+                    timeRanges
+                };
+                localStorage.setItem('tridayData', JSON.stringify(data));
+            };
+            
+            const loadFromLocal = () => {
+                const saved = localStorage.getItem('tridayData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    setTasks(data.tasks || { morning: [], lunch: [], evening: [] });
+                    setGoals(data.goals || { yearly: '', monthly: '', weekly: '' });
+                    setRoutines(data.routines || routines);
+                    setTimeRanges(data.timeRanges || timeRanges);
+                }
+            };
+            
+            useEffect(() => {
+                loadFromLocal();
+                updateProgress();
+                
+                // 시간대 자동 업데이트
+                const interval = setInterval(() => {
+                    setCurrentSection(getCurrentSection());
+                }, 60000); // 1분마다 체크
+                
+                return () => clearInterval(interval);
+            }, []);
+            
+            useEffect(() => {
+                updateProgress();
+            }, [tasks]);
+            
+            return (
+                <div className="min-h-screen p-4">
+                    <div className="max-w-7xl mx-auto">
+                        {/* Header */}
+                        <header className="text-center mb-8 text-white">
+                            <h1 className="text-4xl font-bold mb-2">📅 TriDay Calendar</h1>
+                            <p className="text-lg opacity-90">하루를 3배로 살아보세요!</p>
+                            <div className="mt-4 text-sm">
+                                현재 시간대: <span className="font-bold text-yellow-300">
+                                    {currentSection === 'morning' ? '🌅 아침' : 
+                                     currentSection === 'lunch' ? '☀️ 점심' : '🌙 저녁'}
+                                </span>
+                            </div>
+                        </header>
+                        
+                        {/* Progress Bar */}
+                        <div className="mb-6 bg-white rounded-xl p-4">
+                            <h3 className="text-sm font-semibold mb-2">오늘의 진행률</h3>
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${progress}%` }}>
+                                    {progress}%
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Time Sections */}
+                        <div className="grid md:grid-cols-3 gap-4 mb-6">
+                            {/* Morning Section */}
+                            <div 
+                                className="time-section morning-section"
+                                onDrop={(e) => handleDrop(e, 'morning')}
+                                onDragOver={handleDragOver}
+                            >
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-white">
+                                        🌅 아침 ({timeRanges.morning.start} - {timeRanges.morning.end})
+                                    </h2>
+                                    <button
+                                        onClick={() => loadRoutines('morning')}
+                                        className="text-xs bg-white text-orange-600 px-3 py-1 rounded-full hover:bg-orange-100"
+                                    >
+                                        루틴 추가
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2 mb-4 min-h-[200px]">
+                                    {tasks.morning.map(task => (
+                                        <div
+                                            key={task.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, task, 'morning')}
+                                            className={`task-item ${task.completed ? 'completed' : ''}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={task.completed}
+                                                        onChange={() => toggleTask('morning', task.id)}
+                                                        className="w-5 h-5 cursor-pointer"
+                                                    />
+                                                    <span>{task.icon} {task.text}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteTask('morning', task.id)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="할 일 추가..."
+                                        value={selectedSection === 'morning' ? newTask : ''}
+                                        onChange={(e) => {
+                                            setNewTask(e.target.value);
+                                            setSelectedSection('morning');
+                                        }}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                addTask('morning', newTask);
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-2 rounded-lg border border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                                    />
+                                    <button
+                                        onClick={() => addTask('morning', newTask)}
+                                        className="px-4 py-2 bg-white text-orange-600 rounded-lg hover:bg-orange-50"
+                                    >
+                                        추가
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Lunch Section */}
+                            <div 
+                                className="time-section lunch-section"
+                                onDrop={(e) => handleDrop(e, 'lunch')}
+                                onDragOver={handleDragOver}
+                            >
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-white">
+                                        ☀️ 점심 ({timeRanges.lunch.start} - {timeRanges.lunch.end})
+                                    </h2>
+                                    <button
+                                        onClick={() => loadRoutines('lunch')}
+                                        className="text-xs bg-white text-red-600 px-3 py-1 rounded-full hover:bg-red-100"
+                                    >
+                                        루틴 추가
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2 mb-4 min-h-[200px]">
+                                    {tasks.lunch.map(task => (
+                                        <div
+                                            key={task.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, task, 'lunch')}
+                                            className={`task-item ${task.completed ? 'completed' : ''}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={task.completed}
+                                                        onChange={() => toggleTask('lunch', task.id)}
+                                                        className="w-5 h-5 cursor-pointer"
+                                                    />
+                                                    <span>{task.icon} {task.text}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteTask('lunch', task.id)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="할 일 추가..."
+                                        value={selectedSection === 'lunch' ? newTask : ''}
+                                        onChange={(e) => {
+                                            setNewTask(e.target.value);
+                                            setSelectedSection('lunch');
+                                        }}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                addTask('lunch', newTask);
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-2 rounded-lg border border-red-300 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                    />
+                                    <button
+                                        onClick={() => addTask('lunch', newTask)}
+                                        className="px-4 py-2 bg-white text-red-600 rounded-lg hover:bg-red-50"
+                                    >
+                                        추가
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Evening Section */}
+                            <div 
+                                className="time-section evening-section"
+                                onDrop={(e) => handleDrop(e, 'evening')}
+                                onDragOver={handleDragOver}
+                            >
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-white">
+                                        🌙 저녁 ({timeRanges.evening.start} - {timeRanges.evening.end})
+                                    </h2>
+                                    <button
+                                        onClick={() => loadRoutines('evening')}
+                                        className="text-xs bg-white text-purple-600 px-3 py-1 rounded-full hover:bg-purple-100"
+                                    >
+                                        루틴 추가
+                                    </button>
+                                </div>
+                                
+                                <div className="space-y-2 mb-4 min-h-[200px]">
+                                    {tasks.evening.map(task => (
+                                        <div
+                                            key={task.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, task, 'evening')}
+                                            className={`task-item ${task.completed ? 'completed' : ''}`}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={task.completed}
+                                                        onChange={() => toggleTask('evening', task.id)}
+                                                        className="w-5 h-5 cursor-pointer"
+                                                    />
+                                                    <span>{task.icon} {task.text}</span>
+                                                </div>
+                                                <button
+                                                    onClick={() => deleteTask('evening', task.id)}
+                                                    className="text-red-500 hover:text-red-700"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        placeholder="할 일 추가..."
+                                        value={selectedSection === 'evening' ? newTask : ''}
+                                        onChange={(e) => {
+                                            setNewTask(e.target.value);
+                                            setSelectedSection('evening');
+                                        }}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter') {
+                                                addTask('evening', newTask);
+                                            }
+                                        }}
+                                        className="flex-1 px-3 py-2 rounded-lg border border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                                    />
+                                    <button
+                                        onClick={() => addTask('evening', newTask)}
+                                        className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-purple-50"
+                                    >
+                                        추가
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Goals Section */}
+                        <div className="grid md:grid-cols-3 gap-4 mb-6">
+                            <div className="goal-card">
+                                <h3 className="font-bold text-lg mb-2">🎯 연간 목표</h3>
+                                <textarea
+                                    value={goals.yearly}
+                                    onChange={(e) => {
+                                        setGoals(prev => ({ ...prev, yearly: e.target.value }));
+                                        saveToLocal();
+                                    }}
+                                    placeholder="올해의 목표를 입력하세요..."
+                                    className="w-full p-2 border rounded-lg resize-none"
+                                    rows="3"
+                                />
+                            </div>
+                            
+                            <div className="goal-card">
+                                <h3 className="font-bold text-lg mb-2">📅 월간 목표</h3>
+                                <textarea
+                                    value={goals.monthly}
+                                    onChange={(e) => {
+                                        setGoals(prev => ({ ...prev, monthly: e.target.value }));
+                                        saveToLocal();
+                                    }}
+                                    placeholder="이번 달 목표를 입력하세요..."
+                                    className="w-full p-2 border rounded-lg resize-none"
+                                    rows="3"
+                                />
+                            </div>
+                            
+                            <div className="goal-card">
+                                <h3 className="font-bold text-lg mb-2">📌 주간 목표</h3>
+                                <textarea
+                                    value={goals.weekly}
+                                    onChange={(e) => {
+                                        setGoals(prev => ({ ...prev, weekly: e.target.value }));
+                                        saveToLocal();
+                                    }}
+                                    placeholder="이번 주 목표를 입력하세요..."
+                                    className="w-full p-2 border rounded-lg resize-none"
+                                    rows="3"
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* Time Range Settings */}
+                        <div className="bg-white rounded-xl p-6 mb-6">
+                            <h3 className="font-bold text-lg mb-4">⏰ 시간 범위 설정</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        아침 시간대 ({timeRanges.morning.start} - {timeRanges.morning.end})
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="4"
+                                        max="12"
+                                        value={parseInt(timeRanges.morning.end.split(':')[0])}
+                                        onChange={(e) => {
+                                            const endHour = e.target.value;
+                                            setTimeRanges(prev => ({
+                                                ...prev,
+                                                morning: { ...prev.morning, end: `${endHour.padStart(2, '0')}:00` },
+                                                lunch: { ...prev.lunch, start: `${endHour.padStart(2, '0')}:00` }
+                                            }));
+                                            saveToLocal();
+                                        }}
+                                        className="time-gauge"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">
+                                        점심 시간대 ({timeRanges.lunch.start} - {timeRanges.lunch.end})
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="12"
+                                        max="20"
+                                        value={parseInt(timeRanges.lunch.end.split(':')[0])}
+                                        onChange={(e) => {
+                                            const endHour = e.target.value;
+                                            setTimeRanges(prev => ({
+                                                ...prev,
+                                                lunch: { ...prev.lunch, end: `${endHour.padStart(2, '0')}:00` },
+                                                evening: { ...prev.evening, start: `${endHour.padStart(2, '0')}:00` }
+                                            }));
+                                            saveToLocal();
+                                        }}
+                                        className="time-gauge"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Routine Manager */}
+                        <div className="bg-white rounded-xl p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-lg">🔄 루틴 관리</h3>
+                                <button
+                                    onClick={() => setShowRoutineManager(!showRoutineManager)}
+                                    className="text-sm bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+                                >
+                                    {showRoutineManager ? '닫기' : '관리'}
+                                </button>
+                            </div>
+                            
+                            {showRoutineManager && (
+                                <div className="space-y-2">
+                                    {routines.map(routine => (
+                                        <div key={routine.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                                <span>{routine.icon}</span>
+                                                <span>{routine.name}</span>
+                                                <span className="text-xs text-gray-500">
+                                                    ({routine.time === 'morning' ? '아침' : 
+                                                      routine.time === 'lunch' ? '점심' : '저녁'})
+                                                </span>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    setRoutines(prev => prev.filter(r => r.id !== routine.id));
+                                                    saveToLocal();
+                                                }}
+                                                className="text-red-500 hover:text-red-700"
+                                            >
+                                                삭제
+                                            </button>
+                                        </div>
+                                    ))}
+                                    
+                                    <div className="flex gap-2 mt-4">
+                                        <input
+                                            type="text"
+                                            placeholder="새 루틴 이름"
+                                            id="newRoutineName"
+                                            className="flex-1 px-3 py-2 border rounded-lg"
+                                        />
+                                        <select
+                                            id="newRoutineTime"
+                                            className="px-3 py-2 border rounded-lg"
+                                        >
+                                            <option value="morning">아침</option>
+                                            <option value="lunch">점심</option>
+                                            <option value="evening">저녁</option>
+                                        </select>
+                                        <button
+                                            onClick={() => {
+                                                const name = document.getElementById('newRoutineName').value;
+                                                const time = document.getElementById('newRoutineTime').value;
+                                                if (name) {
+                                                    setRoutines(prev => [...prev, {
+                                                        id: Date.now(),
+                                                        name,
+                                                        time,
+                                                        icon: '📌'
+                                                    }]);
+                                                    document.getElementById('newRoutineName').value = '';
+                                                    saveToLocal();
+                                                }
+                                            }}
+                                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                                        >
+                                            추가
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {!showRoutineManager && (
+                                <div className="flex flex-wrap gap-2">
+                                    {routines.map(routine => (
+                                        <span key={routine.id} className="routine-chip">
+                                            {routine.icon} {routine.name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
+        // 렌더링
+        ReactDOM.render(<TriDayCalendar />, document.getElementById('root'));
+    </script>
+</body>
+</html>
