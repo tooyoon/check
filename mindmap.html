@@ -818,11 +818,10 @@
                         id="new-board-name"
                         type="text"
                         placeholder="보드 이름을 입력하세요..."
-                        onkeypress="if(event.key === 'Enter') { event.preventDefault(); const val = this.value.trim(); if(val) { mindMap.createNewBoard(val); this.value = ''; } }"
                         class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-800 placeholder-gray-500 form-input"
                     />
                     <button
-                        onclick="const input = document.getElementById('new-board-name'); const val = input.value.trim(); if(val) { mindMap.createNewBoard(val); input.value = ''; }"
+                        id="add-board-btn"
                         class="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:from-purple-600 hover:to-pink-700 transform hover:scale-[1.02] transition-all duration-200 shadow-md font-medium flex items-center justify-center gap-2"
                     >
                         <span>✨</span>
@@ -2987,6 +2986,46 @@
             
             // Initialize MindMap
             mindMap = new MindMap();
+            
+            // Add event listeners for board creation
+            const boardInput = document.getElementById('new-board-name');
+            const addBoardBtn = document.getElementById('add-board-btn');
+            
+            if (boardInput) {
+                let isComposing = false;
+                
+                // Handle IME composition
+                boardInput.addEventListener('compositionstart', () => {
+                    isComposing = true;
+                });
+                
+                boardInput.addEventListener('compositionend', () => {
+                    isComposing = false;
+                });
+                
+                // Handle Enter key
+                boardInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !isComposing) {
+                        e.preventDefault();
+                        const boardName = boardInput.value.trim();
+                        if (boardName) {
+                            mindMap.createNewBoard(boardName);
+                            boardInput.value = '';
+                        }
+                    }
+                });
+            }
+            
+            if (addBoardBtn) {
+                // Handle button click
+                addBoardBtn.addEventListener('click', () => {
+                    const boardName = boardInput.value.trim();
+                    if (boardName) {
+                        mindMap.createNewBoard(boardName);
+                        boardInput.value = '';
+                    }
+                });
+            }
             
             // Add sync indicator
             const syncIndicator = document.createElement('div');
